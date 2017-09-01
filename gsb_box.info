@@ -1,0 +1,10 @@
+name = GSB Box
+description = The GSB Box module
+core = 7.x
+package = GSB
+
+; Information added by drupal.org packaging script on 2014-01-31
+version = "7.x-1.0"
+core = "7.x"
+project = "gsb_box"
+datestamp = "1591216729"
