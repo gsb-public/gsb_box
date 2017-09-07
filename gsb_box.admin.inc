@@ -72,6 +72,24 @@ function gsb_box_settings_form($form, $form_state) {
       '#default_value' =>variable_get('box_access_token_url'),
       '#required' => TRUE,
     );
+     $form['box']['box_case_folder_id'] = array(
+      '#title'=>'Box Case Folder Id',
+      '#type' => 'textfield',
+      '#default_value' =>variable_get('box_case_folder_id'),
+      '#required' => TRUE,
+    );
+    $form['box']['box_workingpaper_folder_id'] = array(
+      '#title'=>'Box Working Paper Folder Id',
+      '#type' => 'textfield',
+      '#default_value' =>variable_get('box_workingpaper_folder_id'),
+      '#required' => TRUE,
+    );
+    $form['box']['box_syllabi_folder_id'] = array(
+      '#title'=>'Box Syllabi Folder Id',
+      '#type' => 'textfield',
+      '#default_value' =>variable_get('box_syllabi_folder_id'),
+      '#required' => TRUE,
+    );
    /*$form['box']['box_private_key'] = array(
       '#title'=>'Box Api Private Key',
       '#type' => 'textarea',

@@ -129,14 +129,14 @@ function gsb_box_case_files_import($params = array()) {
                         'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
                         'Authorization' => 'Bearer '.$token),
                         );
-        
+       $box_case_folder_id = trim(variable_get('box_case_folder_id')); 
        $qry_data = array(
               'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
               'content_types'=> 'name,file_content,entries',
               'fields' => 'name,modified_at,entries,metadata',
-              'ancestor_folder_ids'=>'27396148438',
+              'ancestor_folder_ids'=> $box_case_folder_id,
               //'updated_at_range' => '2017-07-11T15:00:00-07:00,2017-07-11T17:00:00-07:00',
                );
         $qry_data['offset'] = 0;
@@ -204,14 +204,14 @@ function gsb_box_case_files_import_bydate($params = array()) {
        $from_date_time = date('Y-m-d', strtotime(' -1 day'))."T".date("H:i:s")."-07:00"; 
        $to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
        $date_range     = $from_date_time.",".$to_date_time;
-       //echo  "date range".$date_range;
+       $box_case_folder_id =   trim(variable_get('box_case_folder_id')); 
        $qry_data = array(
               'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
               'content_types'=> 'name,file_content,entries',
               'fields' => 'name,modified_at,entries,metadata',
-              'ancestor_folder_ids'=>'27396148438',
+              'ancestor_folder_ids'=>$box_case_folder_id,
               'updated_at_range' => $date_range,
                );
         $qry_data['offset'] = 0;
@@ -264,13 +264,14 @@ function gsb_box_case_files_import_specificdate($params = array()) {
        //$to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
        //echo "date range -- '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00'".$date_range;
        $date_range     = '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00';
+       $box_case_folder_id =  trim(variable_get('box_case_folder_id'));
        $qry_data = array(
               'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
               'content_types'=> 'name,file_content,entries',
               'fields' => 'name,modified_at,entries,metadata',
-              'ancestor_folder_ids'=>'27396148438',
+              'ancestor_folder_ids'=>$box_case_folder_id,
               'updated_at_range' => $date_range,
                );
         $qry_data['offset'] = 0;
@@ -316,13 +317,14 @@ function _gsb_box_get_folder_data($token, $limit, $offset) {
                         'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
                         'Authorization' => 'Bearer '.$token),
                         );
+    $box_case_folder_id =   trim(variable_get('box_case_folder_id'));
     $qry_data = array(
           'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
           'type'=>'file',
           'file_extensions'  => 'pdf',
           'content_types'=> 'name,file_content,entries',
           'fields' => 'name,modified_at,entries,metadata',
-          'ancestor_folder_ids'=>'27396148438',
+          'ancestor_folder_ids'=>$box_case_folder_id
            );
     $qry_data['offset'] = $offset;
     $qry_data['limit']  = $limit;
@@ -1037,7 +1039,8 @@ function  _gsb_box_getAuthorProperties($node) {
 function gsb_box_working_paper_file_upload($node) {
   global $conf;
   $language = $node->language;
-  $working_paper_folder = '34571324347';
+  //$working_paper_folder = '34571324347';
+  $working_paper_folder = trim(variable_get('box_workingpaper_folder_id'));
   // get the uuid of the Alfresco Document
   $uuid = -1;
   if (!empty($node->field_document_uuid[$language][0])) {
