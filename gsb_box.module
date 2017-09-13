@@ -387,10 +387,12 @@ function gsb_box_download_box_doc($node) {
       return;
     }
     $language = $node->language;
-    //$file_id = $node->field_box_file_id[$language][0]['value'];
+    if($node->type == 'case')
     $file_id = $node->field_instance_text[$language][0]['value'];
+    elseif($node->type == 'working_paper')
+    $file_id = $node->field_document_uuid[$language][0]['value'];
     
-    // get the repository and object
+    // get the box access token
     $token = gsb_box_get_access_token();
     if ($token != "Error JWT Token") {
        $options1 = array(
