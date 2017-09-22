@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Functions related to dvent admin 
+ * Functions related to GSB Box admin 
  */
 /**
- * Admin configuration form for dvent
+ * Admin configuration form for Box
  */
 function gsb_box_settings_form($form, $form_state) {
 

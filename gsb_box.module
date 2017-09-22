@@ -48,6 +48,12 @@ function gsb_box_menu() {
       'page arguments' => array('gsb_box_get_box_doc', 2, 3),
       'access callback' => TRUE,
     );
+    $items['gsb-box-case-alfresco-node-update'] = array(
+        'title' => 'GSB BOX - Case Node Files Import By Date ',
+        'description' => '',
+        'page callback' => 'gsb_box_case_alresco_node_update',
+        'access arguments' => array('administer box'),
+    );
     return $items;
 }
 
@@ -194,14 +200,11 @@ function gsb_box_case_files_import_bydate($params = array()) {
                         'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
                         'Authorization' => 'Bearer '.$token),
                         );
-       //$from_date_time = date('Y-m-d')."T".date("H:i:s")."-07:00";
-       //$to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
+    
        //$date_range = date('Y-m-d', strtotime(' -1 day')).'T05:05:05-07:00,'.date('Y-m-d').'T05:05:05-07:00';
-       //echo "date range -- '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00'".$date_range;
-       $from_date_time = "";
-       $from_date_time = variable_get('box_cron_run_time');
-       if($from_date_time == "")
-       $from_date_time = date('Y-m-d', strtotime(' -1 day'))."T".date("H:i:s")."-07:00"; 
+       //$from_date_time = variable_get('box_cron_run_time');
+       //$from_date_time = date('Y-m-d', strtotime(' -1 day'))."T".date("H:i:s")."-07:00"; 
+       $from_date_time = date('Y-m-d', strtotime(' -1 day'))."T00:00:00-07:00"; 
        $to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
        $date_range     = $from_date_time.",".$to_date_time;
        $box_case_folder_id =   trim(variable_get('box_case_folder_id')); 
@@ -209,8 +212,8 @@ function gsb_box_case_files_import_bydate($params = array()) {
               'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
-              'content_types'=> 'name,file_content,entries',
-              'fields' => 'name,modified_at,entries,metadata',
+              //'content_types'=> 'name,file_content,entries',
+              'fields' => 'name,modified_at,created_at',
               'ancestor_folder_ids'=>$box_case_folder_id,
               'updated_at_range' => $date_range,
                );
@@ -221,7 +224,7 @@ function gsb_box_case_files_import_bydate($params = array()) {
         $folder_data = drupal_json_decode($response->data);
         echo "===========  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
         echo "<br/>";
-       // print_r($folder_data);
+        //print_r($folder_data);
         if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
             $count = 1;
             foreach($folder_data['entries'] as $row) {
@@ -238,8 +241,7 @@ function gsb_box_case_files_import_bydate($params = array()) {
         else {
           echo 'No files created/updated on this date range - '.$date_range;
         }
-        variable_set('box_cron_run_time',  $to_date_time);
-            
+        //variable_set('box_cron_run_time',  $to_date_time);
    }
    else
    {
@@ -1022,11 +1024,12 @@ function  _gsb_box_getAuthorProperties($node) {
       $last_name = $author_node->field_last_name['und'][0]['value'];
       $authors[] = $first_name . ' ' . $last_name;      
     } 
-    /*else {
-      $first_name = $ewrap_author->field_first_name->value();
-      $last_name = $ewrap_author->field_last_name->value();
-      $authors[] = $first_name . ' ' . $last_name;
-    } */
+    elseif(!empty($item['field_person_fac_or_other'][$language][0]['value']) && $item['field_person_fac_or_other'][$language][0]['value'] == 'Other')
+    {
+      $first_name = $item['field_first_name'][$language][0]['value'];
+      $last_name  = $item['field_last_name'][$language][0]['value'];
+      $authors[]  = $first_name . ' ' . $last_name;
+    }
   }
   return array($authorSunetIds, $authors);
 
@@ -1041,7 +1044,6 @@ function  _gsb_box_getAuthorProperties($node) {
 function gsb_box_working_paper_file_upload($node) {
   global $conf;
   $language = $node->language;
-  //$working_paper_folder = '34571324347';
   $working_paper_folder = trim(variable_get('box_workingpaper_folder_id'));
   // get the uuid of the Alfresco Document
   $uuid = -1;
@@ -1201,7 +1203,6 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
      $authorSunetIds = array();
      $authors = array();
      if (!empty($node->field_authors[$language][0])) {
-       echo "conditions";
        list($authorSunetIds, $authors) = _gsb_box_getAuthorProperties($node);
      } 
     $cwoAcademicArea = '';
@@ -1217,7 +1218,6 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
       $bi_topic_term = taxonomy_term_load($bi_topic_tid);
       $cwoBusinessTopics = $bi_topic_term->name;
     }
-
     $json = array(
                   'title' => $node->title, 
                   'itemId1' => (string)$node->field_item_id[$language][0]['value']
@@ -1282,4 +1282,101 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
     return true;
   }
    
+}
+
+function gsb_box_case_alresco_node_update()
+{
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "case-mapping.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    //echo $file_path;
+    $content = array();
+    $matching_node_ids = $matching_node_ids1 = array();
+    $count = 1;
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        while ( $line = fgetcsv($handle, 4096) ) {
+           if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
+           {
+              $line[1] = str_replace('workspace://SpacesStore/', 'urn:uuid:', $line[1]);
+              $query = db_select('node', 'n');
+              $query->fields('n', array('nid','title'));
+              $query->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+              $query->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
+              $query->condition('n.type', 'case');
+              $query->condition('fdfdu.field_document_uuid_value', $line[1]);
+              $query->condition('fdfdn.field_document_name_value', $line[0]);
+              $results = $query->execute();
+              $data    = $results->fetchAll();
+              if(isset($data[0]) && !empty($data[0]))
+              {
+                   $matching_node_ids[] = $data[0]->nid;
+                   $node    = node_load($data[0]->nid);
+                   $wrapper = entity_metadata_wrapper('node', $node);
+                   $wrapper->field_instance_text->set(trim($line[2]) );
+                   $wrapper->save();
+
+              }
+              else 
+              {
+                  
+                  $query1 = db_select('node', 'n');
+                  $query1->fields('n', array('type', 'nid'));
+                  $query1->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+                  $query1->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
+                  $query1->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+                  $query1->fields('fdfdn', array('entity_id', 'field_document_name_value'));
+                  $query1->condition('n.type', 'case');
+                  $db_or = db_or();
+                  $db_or->condition('fdfdu.field_document_uuid_value', $line[1], '=');
+                  $db_or->condition('fdfdn.field_document_name_value', $line[0], '=');
+                  $query1->condition($db_or);
+                  $results1 = $query1->execute();
+                  $data1    = $results1->fetchAll();
+                  if(isset($data1[0]) && !empty($data1[0]))
+                  {
+                     $content[] = $line;
+                           
+                  }
+                  else
+                  {
+                      $content[] = $line;
+                  }
+              }
+             
+           }
+        }  
+      
+        fclose($handle);
+        $query2 = db_select('node', 'n');
+        $query2->fields('n', array('nid','title'));
+        $query2->condition('n.type', 'case');
+        $results2 = $query2->execute();
+        $data2    = $results2->fetchAll();
+        $unmatching_node_ids = $unmatching_node_ids1 =array();
+        foreach($data2 as $row) {
+            $unmatching_node_ids[]  =  $row->nid;
+            $unmatching_node_ids1[$row->nid] = $row->title;
+        }
+        $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
+        foreach($differents_array as $row1){
+           $title = $unmatching_node_ids1[$row1];
+           $result_array[]  = array('nid' => $row1,
+                               'title' => $title );
+        }
+      
+         header('Content-type: text/csv');
+         header('Content-Disposition: attachment; filename="result.csv"');
+         header('Pragma: no-cache');
+         header('Expires: 0');
+         $file = fopen('php://output', 'w');
+         foreach ($result_array as $row)
+         {
+           fputcsv($file, $row);
+         }
+         exit();         
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
 }
