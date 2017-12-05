@@ -90,7 +90,7 @@ function gsb_box_settings_form($form, $form_state) {
       '#default_value' =>variable_get('box_syllabi_folder_id'),
       '#required' => TRUE,
     );
-   /*$form['box']['box_private_key'] = array(
+  /* $form['box']['box_private_key'] = array(
       '#title'=>'Box Api Private Key',
       '#type' => 'textarea',
       '#default_value' =>variable_get('box_private_key'),

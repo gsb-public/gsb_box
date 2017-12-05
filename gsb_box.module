@@ -49,9 +49,27 @@ function gsb_box_menu() {
       'access callback' => TRUE,
     );
     $items['gsb-box-case-alfresco-node-update'] = array(
-        'title' => 'GSB BOX - Case Node Files Import By Date ',
+        'title' => 'GSB BOX - Case Node Update',
         'description' => '',
         'page callback' => 'gsb_box_case_alresco_node_update',
+        'access arguments' => array('administer box'),
+    );
+    $items['gsb-box-case-wp-node-update'] = array(
+        'title' => 'GSB BOX - Working Paper Node Update ',
+        'description' => '',
+        'page callback' => 'gsb_box_case_working_paper_node_update',
+        'access arguments' => array('administer box'),
+    );
+    $items['gsb-box-case-node-update-box-id'] = array(
+        'title' => 'GSB BOX - Case Node Update Box File ID',
+        'description' => '',
+        'page callback' => 'gsb_box_case_node_update_box_id',
+        'access arguments' => array('administer box'),
+    );
+    $items['gsb-box-case-node-with-no-box-ids'] = array(
+        'title' => 'GSB BOX - Case Node Update Box File ID',
+        'description' => '',
+        'page callback' => 'gsb_box_case_node_no_box_file_ids',
         'access arguments' => array('administer box'),
     );
     return $items;
@@ -80,6 +98,12 @@ function gsb_box_cron() {
  */
 function gsb_box_get_access_token() {
 
+    
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $key_file    = "private_key.txt"; 
+    $file_path   = $module_path."/".$key_file;
+    $private_key = file_get_contents($file_path, FILE_USE_INCLUDE_PATH);
+
     $data = array('client_id'   => trim(variable_get('box_client_id')),
                'client_secret'   => trim(variable_get('box_client_secret')),
                'user_id'         => trim(variable_get('box_user_id')),
@@ -88,12 +112,11 @@ function gsb_box_get_access_token() {
                'key_id'          => trim(variable_get('box_key_id')),
                'api_token_url'   => trim(variable_get('box_api_token_url')),
                'passphrase'      => trim(variable_get('box_passphrase')),
-               //'private_key'    =>  trim(variable_get('box_private_key')),
+               'private_key'    =>  $private_key,
                'access_token_url'=> trim(variable_get('box_access_token_url')),
                'grant_type'      => trim(variable_get('box_grant_type')),
             );
-    $data['private_key'] = "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIYdqQB/mepfkCAggA\nMBQGCCqGSIb3DQMHBAhwZBsnsBXUxASCBMgWM1EG8WhsplUw3/Cy0x3EagKcGCzR\nhAkduqLY+HblVXq6Zw/ndZn7Cf/72946vEhdFOrZK93/lUAhkQiOLKzIEtG3jY2J\n+qhL7rf2gaD7xuSN2zkdufnSVK93Co3z6ieCJQDI63oRMjExiURhng0dbOHtOwIS\ntDOQkOkVFxpclXARKOXGxU8zFbW1TVFxvKzWvq7g61DFvVpgyC6CZezmUHO14UR4\nCPkMfwQQ1Vr2thtzYVxDPQD8GJAzVxRMxSOJnm6FBk+e/7H4jPO0ezuH++e3WwJ8\nwk5zHkq5cXYAFnO+XcYAEWFXYWLaXLo4rSvLZ0ISdDWselTA5Fs1/2TmUG7MDFhJ\nvUjT+6wx+y1WTxcAOF3t+8Ae9Exi5cfqjqPA9ss+2xL2fmIi25mWUN/10pSjyo0i\nlNqkbzyp+dHWLIYqWTRh1jwdZkf4yp+vyIbNZV+WS5c8Qy3DptUT8ILgqD6LB/zL\n8H4QirBv6QIYL3Q+4DIhbge/uZO//n3RFpYOn6sVXgwNoPpt9W8vacVYY70EeNZk\nPzCeAj3TSiuxjzx4nDHamXb6x91R/5ERpftWjFXrdRSOfeHZQUTr0SOgqinaXukK\nECHJgH6/my37ZFHpZk7Io6felNUciUfavg89deGO7AzOachlk+hLOq9fjTQp+khi\n33AHIjdAU/HYvbgzlZLb8elADyJHUnM0phO00NY+mmxisr8jIcjIz/t76htoE//e\nwFI9LDxo/HrClA2kXRaiWIOO8Q88L8rhE7/OP7H/lkpu9NVgmbLg7yKIh5KL5QwB\nqzkwTOkJbtuz0TfveyOAG9zwI7aXBGrD1PP8KMwEpLr0EmOl/bYVFr21jqa94sY4\nFQTvwaVsdAXvCHWZYbfa5wC8ULwknK1iXF5zR/EbsbDYam+xGuVR5sjMFdRSfi9h\nKefFoJuhu95bY87Tbr01kReHCvCKmb75jus2fYjcyj62p1teYVfk0bkyfaXAuoX3\nAWos+PYMfhNNnFdv7cfuyQTV30G97BBoXWmqJrxiJsgcbGTtt+ugwT7PW2Bl19/R\nLWUQBths1Igmn8To05sml/ouupCnDipqeyFZ2CtaAkEKqVCauU2fcOYuA8KPv1jq\nQoPFlA8fJ7lH+6wa/QWlxfmxdRxWnBkbEMwkOODA9iq5zDrgxFVNzhbk50bp1edR\nIPsVp++kc8eQBsYd4O7osiyTZjnbb4/g0hPCEBDTG8IPVC0klAbrTF2eNVvgWAGs\nkmig0lC9yDehaHKsOBYuGmgi37v8MqDlMlNeiNwnNBYCY3yOnVrStP4RS4T0seJR\n+2iVpByPW6FfiziKj50CrhwQfesM54YUtDnonCnF6sLLzptzRKjxM9t4xXSxpS4P\nFNiYx9ZndlBpR/Z0DY4j2smTxsdDK7WaBjKUxFLo05pXvbc3bD7/j0VKEKxZ8Y2i\nQvx0CndqktWgqgXL9pNN+m1KfyOhq8+1OsmAVWRZANCz2+nSGIUYx0hWq2d7tsKv\naPCiplv2L8YGXhAEVHsLcWxOg8LU7V71hZT3AEI1LvfuyOof0KIMze4pdhi6DqRD\nooHusq0OagMLZ/bdOQZsw0CzMudUgaznnBgcmhM5mQRORtyPRPVovaK4Pc1x/asp\nqms=\n-----END ENCRYPTED PRIVATE KEY-----\n";
-     
+ 
       $jwtobj = new \JwtToken\JwtToken($data);
       $resp   = $jwtobj ->create_jwt_token();
       $resp   = json_decode($resp);
@@ -137,7 +160,7 @@ function gsb_box_case_files_import($params = array()) {
                         );
        $box_case_folder_id = trim(variable_get('box_case_folder_id')); 
        $qry_data = array(
-              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
+              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
               'content_types'=> 'name,file_content,entries',
@@ -173,7 +196,7 @@ function gsb_box_case_files_import($params = array()) {
                   //$res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
                   $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
                   if(isset( $res_meta_data)) {
-                      _gsb_box_case_node_import($res_meta_data,$row);
+                      _gsb_box_case_node_import($res_meta_data,$row,$token);
                      $count ++;
                   }
                }
@@ -209,22 +232,21 @@ function gsb_box_case_files_import_bydate($params = array()) {
        $date_range     = $from_date_time.",".$to_date_time;
        $box_case_folder_id =   trim(variable_get('box_case_folder_id')); 
        $qry_data = array(
-              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
+              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
-              //'content_types'=> 'name,file_content,entries',
               'fields' => 'name,modified_at,created_at',
               'ancestor_folder_ids'=>$box_case_folder_id,
-              'updated_at_range' => $date_range,
+              //'updated_at_range' => $date_range,
                );
         $qry_data['offset'] = 0;
         $qry_data['limit']  = 200;
         $qry = http_build_query($qry_data, '', '&');
         $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
         $folder_data = drupal_json_decode($response->data);
-        echo "===========  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
+        //echo "===========  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
+        echo "=========== Total File for create/update - ".$folder_data['total_count']."  ========";
         echo "<br/>";
-        //print_r($folder_data);
         if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
             $count = 1;
             foreach($folder_data['entries'] as $row) {
@@ -232,14 +254,14 @@ function gsb_box_case_files_import_bydate($params = array()) {
                   //$res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
                   $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
                   if(isset( $res_meta_data)) {
-                    _gsb_box_case_node_import($res_meta_data,$row);
+                    _gsb_box_case_node_import($res_meta_data,$row,$token);
                    $count ++;
                   }
                }
             }
         } 
         else {
-          echo 'No files created/updated on this date range - '.$date_range;
+          echo 'No files for create/update';
         }
         //variable_set('box_cron_run_time',  $to_date_time);
    }
@@ -265,39 +287,42 @@ function gsb_box_case_files_import_specificdate($params = array()) {
        //$from_date_time = date('Y-m-d')."T".date("H:i:s")."-07:00";
        //$to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
        //echo "date range -- '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00'".$date_range;
-       $date_range     = '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00';
+       $date_range     = '2017-08-01T05:05:05-07:00,2017-10-17T05:05:05-07:00';
        $box_case_folder_id =  trim(variable_get('box_case_folder_id'));
        $qry_data = array(
-              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
+              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
               'type'=>'file',
               'file_extensions'  => 'pdf',
               'content_types'=> 'name,file_content,entries',
               'fields' => 'name,modified_at,entries,metadata',
               'ancestor_folder_ids'=>$box_case_folder_id,
-              'updated_at_range' => $date_range,
+              //'updated_at_range' => $date_range,
                );
         $qry_data['offset'] = 0;
         $qry_data['limit']  = 200;
         $qry = http_build_query($qry_data, '', '&');
         $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
         $folder_data = drupal_json_decode($response->data);
-        echo "===========  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
+    
+        echo "======  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
         echo "<br/>";
+
         if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
             $count = 1;
             foreach($folder_data['entries'] as $row) {
               if($row['type'] == 'file') {
-                  //$res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
+                 // $res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
                   $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
+                 
                   if(isset( $res_meta_data)) {
-                   _gsb_box_case_node_import($res_meta_data,$row);
+                   _gsb_box_case_node_import($res_meta_data,$row,$token);
                    $count ++;
                   }
                }
             }
         } 
         else {
-          echo 'No files created/updated on this date range - '.$date_range;
+          echo 'No files for create/update';
         }
                    
    }
@@ -426,7 +451,7 @@ function gsb_box_download_box_doc($node) {
     exit();
 }
 
-function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$params = array()) {
+function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token) {
 
     global $user;
     // Validating Product Types  'Case' Content type 
@@ -456,8 +481,7 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$par
     else {
       return;
     }
-
-     // Attempt to find a node with the document uuid
+    // Attempt to find a node with the document uuid
     $query = new EntityFieldQuery();
     $query->fieldCondition('field_document_uuid', 'value', $uuid, '=')->range(0, 1);
     $entities = $query->execute();
@@ -497,13 +521,13 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$par
 
     $language = $node->language;
 
-    _gsb_box_log('uuid = '.$uuid, 'success');
+   
     $ewrapper = entity_metadata_wrapper('node', $node);
 
     // _gsb_box_log('writing document uuid', 'success');
     $ewrapper->field_document_uuid->set($uuid);
 
-    _gsb_box_log('box file id = '.$fileid, 'success');
+   
     //$ewrapper->field_box_file_id->set($fileid);
     $ewrapper->field_instance_text->set($fileid);
    
@@ -664,9 +688,9 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$par
     }
 
     //_gsb_box_log('writing field_academic_area_unlimited', 'success');
-    if (!empty($meta_data['entries'][0]['academicArea1']) && trim($meta_data['entries'][0]['academicArea1']) != '') {
+    if (!empty($meta_data['entries'][0]['academicArea2']) && trim($meta_data['entries'][0]['academicArea2']) != '') {
       $ids = array();
-      $academic_area = $meta_data['entries'][0]['academicArea1'];
+      $academic_area = $meta_data['entries'][0]['academicArea2'];
       $results = taxonomy_get_term_by_name($academic_area);
       foreach ($results as $item) {
         if ($item->vocabulary_machine_name == 'academic_area') {
@@ -677,6 +701,22 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$par
     } else {
       $ewrapper->field_academic_area_unlimited = array();
     }
+
+    //_gsb_box_log('Centers and Research Programs', 'success');
+    if (!empty($meta_data['entries'][0]['centersInitiativesInstitutes']) && trim($meta_data['entries'][0]['centersInitiativesInstitutes']) != '') {
+      $ids = array();
+      $centers = $meta_data['entries'][0]['centersInitiativesInstitutes'];
+      $results = taxonomy_get_term_by_name($centers);
+      foreach ($results as $item) {
+        if ($item->vocabulary_machine_name == 'centers_research_programs') {
+          $ids[] = $item->tid;
+        }
+      }
+      $ewrapper->field_centers_research_programs->set($ids);
+    } else {
+      $ewrapper->field_centers_research_programs = array();
+    }
+
 
     //_gsb_box_log('writing field_paper_copy', 'success');
      $ewrapper->field_paper_copy->set('No');
@@ -741,12 +781,32 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$par
     $node->status = 1;
     $node->workbench_moderation['updating_live_revision'] = 1;
     node_save($node);
-   
-   // _gsb_box_log('Case node created/updated successfully with File ID:'.$fileid , 'success');
+    
+    // _gsb_box_log('Case node created/updated successfully with File ID:'.$fileid , 'success');
     echo "<br/>";
-    echo "Case node created/updated successfully with File ID:".$fileid;
+    echo "Case node created/updated successfully with File ID: ".$fileid." And Node ID: ".$node->nid;
+    _gsb_box_log('Case node created/updated successfully with File ID : '.$fileid .' And Node ID: '.$node->nid, 'success');
     echo "<br/>";
-   
+    //_gsb_box_log('Case node uuid : '.$uuid, 'success');
+    $enterprise_id = "enterprise_".trim(variable_get('box_enterprise_id'));
+    $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
+
+    $options   = array(
+                    'method'  => 'PUT',
+                    'data'    =>  $qry_data,
+                    'headers' => array('Content-Type' => 'application/json-patch+json',
+                    'Authorization' => 'Bearer '.$token),
+                    );
+    $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
+    if($response_data->status_message == 'OK' &&  $response_data->code == '200') {
+        echo "Case file metadata updated with File ID: ".$fileid;
+       _gsb_box_log('Case file metadata updated with File ID: '.$fileid, 'success');
+    }
+    else {
+       echo "Case file metadata failed to update with File ID: ".$fileid;
+       _gsb_box_log('Case file metadata failed to update with File ID: '.$fileid, 'success');
+    }
+  
 }
 
 function _gsb_box_fetch_folder_details($access_token,$folder_id) {
@@ -1058,7 +1118,7 @@ function gsb_box_working_paper_file_upload($node) {
     $file = file_load($fid);   
   } 
 
-  $filename = '';
+  $filename    = '';
   $new_item_id = '';
   if (!empty($node->field_item_id[$language][0])) {
     $filename = 'RP' . (integer)$node->field_item_id[$language][0]['value'];
@@ -1070,20 +1130,40 @@ function gsb_box_working_paper_file_upload($node) {
   }
   if($file->filemime == 'application/pdf')
   $filename = $filename.".pdf"; 
+  else
+  $filename = $filename.".pdf"; 
+  $file_empty_flag = false;
+  if(empty($file)) {
+    $file_empty_flag = true;
+    global $user;
+    $uri = 'public://box-place-holder.pdf';
+    $file = new stdClass;
+    $file->uid = $user->uid;
+    $file->filename = 'box-place-holder.pdf';
+    $file->uri = $uri;
+    $file->filemime = 'application/pdf';
+    $file->filesize = filesize($uri);
+    $file->status = 1;
+  }
+  else {
+    $node->field_has_pdf[$language][0]['value'] = '1';
+  }
   
   $box_object = null;
-
   // check if we already have a document/uuid on Box
   if ($uuid == -1) {
     // create a document/file on Box
     $box_object = _gsb_box_working_paper_createDocument($file,$working_paper_folder, $filename); 
 
   } else {
-      $box_object = _gsb_box_working_paper_createDocument($file,$working_paper_folder, $filename); 
+     $box_object = _gsb_box_working_paper_updateDocument($file, $working_paper_folder, $filename, $uuid);
+     /* $box_object = _gsb_box_working_paper_createDocument($file,$working_paper_folder, $filename); 
       if (isset($box_object['type']) && $box_object['type'] == 'error') {
        $box_object = _gsb_box_working_paper_updateDocument($file, $working_paper_folder, $filename, $uuid); 
-      }
+      }*/
   }
+
+
 
   // set the item id, if we created a new one 
   if (!empty($new_item_id)) {
@@ -1092,35 +1172,37 @@ function gsb_box_working_paper_file_upload($node) {
 
   // set the product type
   $node->field_product_type[$language][0]['value'] = 'Working Paper';
-
-  // set the 'has pdf' checkbox
-  $node->field_has_pdf[$language][0]['value'] = '1';
-
+  
    // get the properties for the object from Box
    if(isset($box_object['entries'][0]['id']) && !empty($box_object['entries'][0]['id'])) {
+      // set the 'has pdf' checkbox
+      $node->field_has_pdf[$language][0]['value'] = '1';
       $node->field_document_uuid[$language][0]['value'] = $box_object['entries'][0]['id'];
       _gsb_box_create_update_meta_data($node,$file,$box_object['entries'][0]['id']);
    }
    else {
       _gsb_box_create_update_meta_data($node,$file,$uuid);
    }
-
-  /*if (isset($box_object['type']) && $box_object['type'] == 'error') {
+   
+  if ( (isset($box_object['type']) && $box_object['type'] == 'error') || $box_object == 'Error JWT Token' ) {
+    if($box_object != "Error JWT Token")
     drupal_set_message(t('Error: Creating/Updating document on Box - '. $box_object['message']), 'error', FALSE);
+    else
+    drupal_set_message(t('Error: Creating/Updating document on Box - JWT Token Error!'), 'error', FALSE);
     return false;
-  }*/
-
-   // remove file from the Drupal system
-  if ($file) {
-    $usage = file_usage_list($file);
-    if (!empty($usage)) {
-      if (count($usage['file']['node']) == 1 && !empty($usage['file']['node'][$node->nid])) {
-        file_delete($file,TRUE);
-      }
-    } else {
-      file_delete($file);
-    }
   }
+   // remove file from the Drupal system
+  if (!empty($file) && $file_empty_flag == false) {
+      $usage = file_usage_list($file);
+      if (!empty($usage)) {
+        if (count($usage['file']['node']) == 1 && !empty($usage['file']['node'][$node->nid])) {
+          file_delete($file,TRUE);
+        }
+      } else {
+        file_delete($file);
+      }
+  }
+  
   return true;
 
 }
@@ -1153,7 +1235,8 @@ function _gsb_box_working_paper_createDocument($file, $folder, $filename) {
      }
      else
      {
-        drupal_set_message('JWT Token Error!');
+        //drupal_set_message('JWT Token Error!');
+        return $token;
      }
 }
 
@@ -1186,7 +1269,8 @@ function _gsb_box_working_paper_updateDocument($file, $folder, $filename, $file_
      }
      else
      {
-        drupal_set_message('JWT Token has not generated!');
+        //drupal_set_message('JWT Token Error!');
+        return $token;
      }
 }
 
@@ -1235,7 +1319,7 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
     if(!empty($node->field_description[$language][0]['value'] ))
     $json['abstract'] = strip_tags($node->field_description[$language][0]['value']); 
     if($cwoAcademicArea != "")
-    $json['academicArea1'] = $cwoAcademicArea;
+    $json['academicArea2'] = $cwoAcademicArea;
     if($cwoBusinessTopics != "")
     $json['businessTopics1'] = $cwoBusinessTopics;
    
@@ -1258,7 +1342,7 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
        if(!empty($authorSunetIds))
        $qry_data .=   ',{"op":"add","path":"/authorsSunetidCommaSeparatedForMultipleAuthors","value":"'.implode(', ', $authorSunetIds).'"}';
        if($cwoAcademicArea != "")
-       $qry_data .=   ',{"op":"add","path":"/academicArea1","value":"'.$cwoAcademicArea.'"}';
+       $qry_data .=   ',{"op":"add","path":"/academicArea2","value":"'.$cwoAcademicArea.'"}';
        if($cwoBusinessTopics != "")
        $qry_data .=   ',{"op":"add","path":"/businessTopics1","value":"'.$cwoBusinessTopics.'"}';
        if(!empty($node->field_description[$language][0]['value'])){
@@ -1284,10 +1368,9 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
    
 }
 
-function gsb_box_case_alresco_node_update()
-{
+function gsb_box_case_alresco_node_update( ) {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "case-mapping.csv"; 
+    $csv_file    = "2017-10-17-case-mapping.csv"; 
     $file_path   = $module_path."/".$csv_file;
     //echo $file_path;
     $content = array();
@@ -1295,6 +1378,7 @@ function gsb_box_case_alresco_node_update()
     $count = 1;
     if ( $handle = fopen($file_path, 'r') ) {
         $line = fgetcsv($handle, 4096);
+        $count = 1;
         while ( $line = fgetcsv($handle, 4096) ) {
            if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
            {
@@ -1350,21 +1434,27 @@ function gsb_box_case_alresco_node_update()
         fclose($handle);
         $query2 = db_select('node', 'n');
         $query2->fields('n', array('nid','title'));
+        $query2->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+        $query2->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
+        $query2->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+        $query2->fields('fdfdn', array('entity_id', 'field_document_name_value'));
         $query2->condition('n.type', 'case');
         $results2 = $query2->execute();
         $data2    = $results2->fetchAll();
         $unmatching_node_ids = $unmatching_node_ids1 =array();
         foreach($data2 as $row) {
             $unmatching_node_ids[]  =  $row->nid;
-            $unmatching_node_ids1[$row->nid] = $row->title;
+            $unmatching_node_ids1[$row->nid] = array($row->title,$row->field_document_name_value);
         }
+
         $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
         foreach($differents_array as $row1){
-           $title = $unmatching_node_ids1[$row1];
+           $title = $unmatching_node_ids1[$row1][0];
+           $file_name = $unmatching_node_ids1[$row1][1];
            $result_array[]  = array('nid' => $row1,
-                               'title' => $title );
+                               'title' => $title,
+                               'file_name'=> $file_name);
         }
-      
          header('Content-type: text/csv');
          header('Content-Disposition: attachment; filename="result.csv"');
          header('Pragma: no-cache');
@@ -1374,7 +1464,218 @@ function gsb_box_case_alresco_node_update()
          {
            fputcsv($file, $row);
          }
-         exit();         
+         exit();    
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
+}
+
+function gsb_box_case_working_paper_node_update( ){
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "2017-10-27-working-paper.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    //echo $file_path;
+    $content = array();
+    $matching_node_ids = $matching_node_ids1 = array();
+    $count = 1;
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        while ( $line = fgetcsv($handle, 4096) ) {
+           
+           if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
+           {
+              $item_data = array();
+              $item_data = (explode(".",$line[0]));
+              $item_id   = substr($item_data[0], 2);
+              //echo "item id ". $item_id;
+              //echo "<br/>";
+              $line[1] = str_replace('workspace://SpacesStore/', 'urn:uuid:', $line[1]);
+              $query = db_select('node', 'n');
+              $query->fields('n', array('nid','title'));
+              $query->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+              $query->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+              $query->condition('n.type', 'working_paper');
+              $query->condition('fdfdu.field_document_uuid_value', $line[1]);
+              $query->condition('fdfdn.field_item_id_value', $item_id);
+              $results = $query->execute();
+              $data    = $results->fetchAll();
+              if(isset($data[0]) && !empty($data[0]))
+              {
+                   //echo "Document uuid- ".$line[1]." File id -".$line[2];
+                   //echo "<br/>";
+                   $matching_node_ids[] = $data[0]->nid;
+                   $node    = node_load($data[0]->nid);
+                   $wrapper = entity_metadata_wrapper('node', $node);
+                   $wrapper->field_document_uuid->set(trim($line[2]) );
+                   $wrapper->save();
+         
+              }
+              else 
+              {
+                  
+                  $query1 = db_select('node', 'n');
+                  $query1->fields('n', array('type', 'nid'));
+                  $query1->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+                  $query1->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+                  $query1->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+                  $query1->fields('fdfdn', array('entity_id', 'field_item_id_value'));
+                  $query1->condition('n.type', 'working_paper');
+                  $db_or = db_or();
+                  $db_or->condition('fdfdu.field_document_uuid_value', $line[1], '=');
+                  $db_or->condition('fdfdn.field_item_id_value', $item_id, '=');
+                  $query1->condition($db_or);
+                  $results1 = $query1->execute();
+                  $data1    = $results1->fetchAll();
+                  if(isset($data1[0]) && !empty($data1[0]))
+                  {
+                     $content[] = $line;
+                           
+                  }
+                  else
+                  {
+                      $content[] = $line;
+                  }
+              }
+             
+           }
+        }  
+      
+        fclose($handle);
+        $query2 = db_select('node', 'n');
+        $query2->fields('n', array('nid','title'));
+        $query2->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+        $query2->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+        $query2->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+        $query2->fields('fdfdn', array('entity_id', 'field_item_id_value'));
+        $query2->condition('n.type', 'working_paper');
+        $results2 = $query2->execute();
+        $data2    = $results2->fetchAll();
+        $unmatching_node_ids = $unmatching_node_ids1 =array();
+        foreach($data2 as $row) {
+            $unmatching_node_ids[]  =  $row->nid;
+            $unmatching_node_ids1[$row->nid] = array($row->title,$row->field_item_id_value);
+        }
+
+        $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
+        foreach($differents_array as $row1) {
+           $title = $unmatching_node_ids1[$row1][0];
+           $file_name = $unmatching_node_ids1[$row1][1];
+           $result_array[]  = array('nid' => $row1,
+                               'title' => $title,
+                               'item_id'=> "RP".$file_name.".pdf");
+        }
+         header('Content-type: text/csv');
+         header('Content-Disposition: attachment; filename="working-paper-result.csv"');
+         header('Pragma: no-cache');
+         header('Expires: 0');
+         $file = fopen('php://output', 'w');
+         foreach ($result_array as $row)
+         {
+           fputcsv($file, $row);
+         }
+         exit(); 
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
+}
+
+function gsb_box_case_node_update_box_id()
+{
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "Box-file-ids-update-for-Case-Node.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    $content = array();
+    $matching_node_ids = $matching_node_ids1 = array();
+    $count = 1;
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        $count = 1;
+        while ( $line = fgetcsv($handle, 4096) ) {
+           if(!empty($line[0]) && !empty($line[3]))
+           {
+               echo  $count." == ". $line[0]." --- ".$line[2]." ---- ".$line[3];
+               echo "<br/>";
+               $node    = node_load($line[0]);
+               $wrapper = entity_metadata_wrapper('node', $node);
+               $wrapper->field_instance_text->set(trim($line[3]) );
+               $wrapper->save();
+               $count++;  
+           }
+        }  
+        fclose($handle);
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
+}
+
+function gsb_box_case_node_no_box_file_ids( )
+{
+  $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "Case-Node-With-Box-file-ids-consolidated-list-2017-11-27.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    //echo $file_path;
+    $content = array();
+    $matching_node_ids = array();
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        $count = 1;
+        while ( $line = fgetcsv($handle, 4096) ) {
+           if(!empty($line[2]))
+           {
+              $query = db_select('node', 'n');
+              $query->fields('n', array('nid','title'));
+              //$query->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+              //$query->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
+              $query->join('field_data_field_instance_text', 'fdfit', "n.nid = fdfit.entity_id");
+              $query->condition('n.type', 'case');
+              $query->condition('fdfit.field_instance_text_value', trim($line[2]));
+              $results = $query->execute();
+              $data    = $results->fetchAll();
+              if(isset($data[0]) && !empty($data[0]))
+              {
+                   $matching_node_ids[] = $data[0]->nid;
+             
+              }
+            
+           }
+        }  
+      
+        fclose($handle);
+        $query2 = db_select('node', 'n');
+        $query2->fields('n', array('nid','title'));
+        $query2->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+        $query2->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
+        $query2->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+        $query2->fields('fdfdn', array('entity_id', 'field_document_name_value'));
+        $query2->condition('n.type', 'case');
+        $results2 = $query2->execute();
+        $data2    = $results2->fetchAll();
+        $unmatching_node_ids = $unmatching_node_ids1 =array();
+        foreach($data2 as $row) {
+            $unmatching_node_ids[]  =  $row->nid;
+            $unmatching_node_ids1[$row->nid] = array($row->title,$row->field_document_name_value);
+        }
+        $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
+         foreach($differents_array as $row1){
+           $title = $unmatching_node_ids1[$row1][0];
+           $file_name = $unmatching_node_ids1[$row1][1];
+           $result_array[]  = array('nid' => $row1,
+                               'title' => $title,
+                               'file_name'=> $file_name);
+        }
+         header('Content-type: text/csv');
+         header('Content-Disposition: attachment; filename="Case-Nodes-to-update-box-FileId.csv"');
+         header('Pragma: no-cache');
+         header('Expires: 0');
+         $file = fopen('php://output', 'w');
+         foreach ($result_array as $row)
+         {
+           fputcsv($file, $row);
+         }
+         exit();    
     }
     else {
       echo 'Unable to read uploaded file !filepath '.$file_path ;
