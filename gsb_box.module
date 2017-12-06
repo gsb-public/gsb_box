@@ -72,6 +72,18 @@ function gsb_box_menu() {
         'page callback' => 'gsb_box_case_node_no_box_file_ids',
         'access arguments' => array('administer box'),
     );
+    $items['gsb-box-wp-node-update-final'] = array(
+        'title' => 'GSB BOX - WP Node Update with Box File ID',
+        'description' => '',
+        'page callback' => 'gsb_box_working_paper_node_update_final',
+        'access arguments' => array('administer box'),
+    );
+    $items['gsb-box-wp-node-with-no-box-ids'] = array(
+        'title' => 'GSB BOX - WP Node without Box File ID',
+        'description' => '',
+        'page callback' => 'gsb_box_wp_node_no_box_file_ids',
+        'access arguments' => array('administer box'),
+    );
     return $items;
 }
 
@@ -1471,7 +1483,7 @@ function gsb_box_case_alresco_node_update( ) {
     }
 }
 
-function gsb_box_case_working_paper_node_update( ){
+function gsb_box_case_working_paper_node_update( ) {
     $module_path = drupal_get_path('module', 'gsb_box');
     $csv_file    = "2017-10-27-working-paper.csv"; 
     $file_path   = $module_path."/".$csv_file;
@@ -1668,6 +1680,123 @@ function gsb_box_case_node_no_box_file_ids( )
         }
          header('Content-type: text/csv');
          header('Content-Disposition: attachment; filename="Case-Nodes-to-update-box-FileId.csv"');
+         header('Pragma: no-cache');
+         header('Expires: 0');
+         $file = fopen('php://output', 'w');
+         foreach ($result_array as $row)
+         {
+           fputcsv($file, $row);
+         }
+         exit();    
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
+}
+
+function gsb_box_working_paper_node_update_final( ) {
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "2017-12-05-working-paper.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    $content = array();
+    $matching_node_ids = $matching_node_ids1 = array();
+    $count = 1;
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        while ( $line = fgetcsv($handle, 4096) ) {
+           
+           if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
+           {
+              $item_data = array();
+              $item_data = (explode(".",$line[0]));
+              $item_id   = substr($item_data[0], 2);
+              //echo "item id ". $item_id;
+              //echo "<br/>";
+              $line[1] = str_replace('workspace://SpacesStore/', 'urn:uuid:', $line[1]);
+              $query = db_select('node', 'n');
+              $query->fields('n', array('nid','title'));
+              $query->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+              $query->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+              $query->condition('n.type', 'working_paper');
+              $query->condition('fdfdu.field_document_uuid_value', $line[1]);
+              $query->condition('fdfdn.field_item_id_value', $item_id);
+              $results = $query->execute();
+              $data    = $results->fetchAll();
+              if(isset($data[0]) && !empty($data[0]))
+              {
+                   echo "Document uuid- ".$line[1]." File id -".$line[2]." Node id - ".$data[0]->nid;
+                   echo "<br/>";
+                   $matching_node_ids[] = $data[0]->nid;
+                   $node    = node_load($data[0]->nid);
+                   $wrapper = entity_metadata_wrapper('node', $node);
+                   $wrapper->field_document_uuid->set(trim($line[2]) );
+                   $wrapper->save();
+         
+              }
+               
+           }
+        }  
+    
+    }
+    else {
+      echo 'Unable to read uploaded file !filepath '.$file_path ;
+    }
+}
+
+function gsb_box_wp_node_no_box_file_ids( )
+{
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "working-paper-consolidated.csv"; 
+    $file_path   = $module_path."/".$csv_file;
+    $content = array();
+    $matching_node_ids = array();
+    if ( $handle = fopen($file_path, 'r') ) {
+        $line = fgetcsv($handle, 4096);
+        while ( $line = fgetcsv($handle, 4096) ) {
+           if(!empty($line[2]))
+           {
+              $query = db_select('node', 'n');
+              $query->fields('n', array('nid','title'));
+              $query->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+              $query->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+              $query->condition('n.type', 'working_paper');
+              $query->condition('fdfdu.field_document_uuid_value', $line[2]);
+              $results = $query->execute();
+              $data    = $results->fetchAll();
+              if(isset($data[0]) && !empty($data[0]))
+              {
+                   $matching_node_ids[] = $data[0]->nid;
+             
+              }
+            
+           }
+        }  
+      
+        fclose($handle);
+        $query2 = db_select('node', 'n');
+        $query2->fields('n', array('nid','title'));
+        $query2->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
+        $query2->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
+        $query2->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
+        $query2->fields('fdfdn', array('entity_id', 'field_item_id_value'));
+        $query2->condition('n.type', 'working_paper');
+        $results2 = $query2->execute();
+        $data2    = $results2->fetchAll();
+        $unmatching_node_ids = $unmatching_node_ids1 =array();
+        foreach($data2 as $row) {
+            $unmatching_node_ids[]  =  $row->nid;
+            $unmatching_node_ids1[$row->nid] = array($row->title,$row->field_document_name_value);
+        }
+        $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
+         foreach($differents_array as $row1){
+           $title = $unmatching_node_ids1[$row1][0];
+           $file_name = $unmatching_node_ids1[$row1][1];
+           $result_array[]  = array('nid' => $row1,
+                               'title' => $title,
+                               'file_name'=> $file_name);
+        }
+         header('Content-type: text/csv');
+         header('Content-Disposition: attachment; filename="WP-Nodes-to-update-box-FileId.csv"');
          header('Pragma: no-cache');
          header('Expires: 0');
          $file = fopen('php://output', 'w');
