@@ -1,5 +1,4 @@
 <?php
-//chdir(dirname(__DIR__));
 namespace JwtToken;
 require_once('vendor/autoload.php');
 use Zend\Config\Config;
@@ -7,7 +6,6 @@ use Zend\Config\Factory;
 use Zend\Http\PhpEnvironment\Request;
 use Firebase\JWT\JWT;
 date_default_timezone_set("UTC"); 
-//$config = Factory::fromFile('config/config.php', true); // Create a Zend Config Object
 
 class JwtToken
 {
@@ -66,11 +64,9 @@ class JwtToken
      */
     private $passPhrase;
     /**
-     * Create a configured instance to use the reCAPTCHA service.
+     * Create a configured instance to use the Box Token.
      *
-     * @param string $secret shared secret between site and reCAPTCHA server.
-     * @param RequestMethod $requestMethod method used to send the request. Defaults to POST.
-     */
+    */
     public function __construct($data=array())
     {
         if (empty($data['private_key'])) {
@@ -123,8 +119,6 @@ class JwtToken
         }
         else
         $this->passPhrase = $data['passphrase'];
-        
-         
   
     }
 
@@ -133,7 +127,6 @@ class JwtToken
        date_default_timezone_set("UTC"); 
        $tokenId    = base64_encode(mcrypt_create_iv(32));
        $issuedAt   = time();
-      // $issuedAt   = $issuedAt + 20;
        $notBefore  = $issuedAt + 10;             //Adding 10 seconds
        $expire     = $issuedAt + 60;            // Adding 60 seconds   
        $data = [
