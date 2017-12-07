@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Contains hook implementations and helper functions for GSB Dvent
+ * Contains hook implementations and helper functions for GSB Box
  */
 require_once dirname(__FILE__) . '/jwt-lib/JwtToken.php';
 date_default_timezone_set("UTC"); 
@@ -23,22 +23,10 @@ function gsb_box_menu() {
         'page callback' => 'gsb_box_get_access_token',
         'access arguments' => array('administer box'),
     );
-    $items['gsb-box-case-files-import'] = array(
-        'title' => 'GSB BOX - Case Node Files Import ',
-        'description' => '',
-        'page callback' => 'gsb_box_case_files_import',
-        'access arguments' => array('administer box'),
-    );
     $items['gsb-box-case-files-import-bydate'] = array(
         'title' => 'GSB BOX - Case Node Files Import By Date ',
         'description' => '',
         'page callback' => 'gsb_box_case_files_import_bydate',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-files-import-specificdate'] = array(
-        'title' => 'GSB BOX - Case Node Files Import By Date ',
-        'description' => '',
-        'page callback' => 'gsb_box_case_files_import_specificdate',
         'access arguments' => array('administer box'),
     );
     $items['gsb-box/gsb-box-get-box-doc/%node/%'] = array(
@@ -106,16 +94,15 @@ function gsb_box_cron() {
 
 
 /**
- *  Generating access token for API.
+ *  Generating access token for Box API.
  */
 function gsb_box_get_access_token() {
-
-    
-    $module_path = drupal_get_path('module', 'gsb_box');
+   
+    /*$module_path = drupal_get_path('module', 'gsb_box');
     $key_file    = "private_key.txt"; 
     $file_path   = $module_path."/".$key_file;
-    $private_key = file_get_contents($file_path, FILE_USE_INCLUDE_PATH);
-
+    $private_key = file_get_contents($file_path, FILE_USE_INCLUDE_PATH);*/
+    $private_key = variable_get("gsb_box_private_key", "");
     $data = array('client_id'   => trim(variable_get('box_client_id')),
                'client_secret'   => trim(variable_get('box_client_secret')),
                'user_id'         => trim(variable_get('box_user_id')),
@@ -158,70 +145,6 @@ function gsb_box_get_access_token() {
       }
 }
 
-/**
- * Fetching all case files with product type, Case. Create/update nodes in GSB website
- */
-function gsb_box_case_files_import($params = array()) {
- 
-  $token = gsb_box_get_access_token();
-  if ($token != "Error JWT Token") {
-       $options = array(
-                        'method' => 'GET',
-                        'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
-                        'Authorization' => 'Bearer '.$token),
-                        );
-       $box_case_folder_id = trim(variable_get('box_case_folder_id')); 
-       $qry_data = array(
-              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
-              'type'=>'file',
-              'file_extensions'  => 'pdf',
-              'content_types'=> 'name,file_content,entries',
-              'fields' => 'name,modified_at,entries,metadata',
-              'ancestor_folder_ids'=> $box_case_folder_id,
-              //'updated_at_range' => '2017-07-11T15:00:00-07:00,2017-07-11T17:00:00-07:00',
-               );
-        $qry_data['offset'] = 0;
-        $qry_data['limit']  = 200;
-        $qry = http_build_query($qry_data, '', '&');
-        $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
-        $folder_data = drupal_json_decode($response->data);
-        if($folder_data['total_count'] > 200) {
-          $limit = 200;
-          $loop_count = round($folder_data['total_count']/200);
-          for($i=1; $i<$loop_count; $i++) {
-              $offset =   $limit * $i;
-              $folder_data_return = _gsb_box_get_folder_data($token, $limit, $offset);
-              $folder_data['entries'] = array_merge($folder_data['entries'] , $folder_data_return['entries']);
-              $folder_data['limit'] = 200;
-              $folder_data['offset'] = $offset;
-          }
-         
-          //if($folder_data->total_count>)
-          //echo "</pre>";
-        }
-        echo "========  Entire set of folder data with count - ".$folder_data['total_count']."===========";
-      
-        if(isset( $folder_data['entries'])) {
-            $count = 1;
-            foreach($folder_data['entries'] as $row) {
-              if($row['type'] == 'file') {
-                  //$res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
-                  $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
-                  if(isset( $res_meta_data)) {
-                      _gsb_box_case_node_import($res_meta_data,$row,$token);
-                     $count ++;
-                  }
-               }
-            }
-       } 
-            
-   }
-   else
-   {
-      drupal_set_message('JWT Token has not generated!');
-   }
-  
-}
 
 /**
  * Fetching all case files with product type, Case. Create/update nodes in GSB website
@@ -236,12 +159,9 @@ function gsb_box_case_files_import_bydate($params = array()) {
                         'Authorization' => 'Bearer '.$token),
                         );
     
-       //$date_range = date('Y-m-d', strtotime(' -1 day')).'T05:05:05-07:00,'.date('Y-m-d').'T05:05:05-07:00';
-       //$from_date_time = variable_get('box_cron_run_time');
-       //$from_date_time = date('Y-m-d', strtotime(' -1 day'))."T".date("H:i:s")."-07:00"; 
-       $from_date_time = date('Y-m-d', strtotime(' -1 day'))."T00:00:00-07:00"; 
+       /*$from_date_time = date('Y-m-d', strtotime(' -1 day'))."T00:00:00-07:00"; 
        $to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
-       $date_range     = $from_date_time.",".$to_date_time;
+       $date_range     = $from_date_time.",".$to_date_time;*/
        $box_case_folder_id =   trim(variable_get('box_case_folder_id')); 
        $qry_data = array(
               'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
@@ -256,87 +176,24 @@ function gsb_box_case_files_import_bydate($params = array()) {
         $qry = http_build_query($qry_data, '', '&');
         $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
         $folder_data = drupal_json_decode($response->data);
-        //echo "===========  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
         echo "=========== Total File for create/update - ".$folder_data['total_count']."  ========";
         echo "<br/>";
         if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
             $count = 1;
             foreach($folder_data['entries'] as $row) {
               if($row['type'] == 'file') {
-                  //$res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
                   $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
                   if(isset( $res_meta_data)) {
                     _gsb_box_case_node_import($res_meta_data,$row,$token);
-                   $count ++;
+                    $count ++;
                   }
                }
             }
         } 
         else {
           echo 'No files for create/update';
+          drupal_set_message('No files for create/update!');
         }
-        //variable_set('box_cron_run_time',  $to_date_time);
-   }
-   else
-   {
-      drupal_set_message('JWT Token has not generated!');
-   }
-  
-}
-
-/**
- * Fetching files with product type, Case. Create/update nodes in GSB website
- */
-function gsb_box_case_files_import_specificdate($params = array()) {
-
-  $token = gsb_box_get_access_token();
-  if ($token != "Error JWT Token") {
-       $options = array(
-                        'method' => 'GET',
-                        'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
-                        'Authorization' => 'Bearer '.$token),
-                        );
-       //$from_date_time = date('Y-m-d')."T".date("H:i:s")."-07:00";
-       //$to_date_time   = date('Y-m-d')."T".date("H:i:s")."-07:00";
-       //echo "date range -- '2017-08-09T05:05:05-07:00,2017-08-10T05:05:05-07:00'".$date_range;
-       $date_range     = '2017-08-01T05:05:05-07:00,2017-10-17T05:05:05-07:00';
-       $box_case_folder_id =  trim(variable_get('box_case_folder_id'));
-       $qry_data = array(
-              'mdfilters'=> '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case","publish":"Yes"}}]',
-              'type'=>'file',
-              'file_extensions'  => 'pdf',
-              'content_types'=> 'name,file_content,entries',
-              'fields' => 'name,modified_at,entries,metadata',
-              'ancestor_folder_ids'=>$box_case_folder_id,
-              //'updated_at_range' => $date_range,
-               );
-        $qry_data['offset'] = 0;
-        $qry_data['limit']  = 200;
-        $qry = http_build_query($qry_data, '', '&');
-        $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
-        $folder_data = drupal_json_decode($response->data);
-    
-        echo "======  Date range - ".$date_range." Total File Count - ".$folder_data['total_count']."  ========";
-        echo "<br/>";
-
-        if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
-            $count = 1;
-            foreach($folder_data['entries'] as $row) {
-              if($row['type'] == 'file') {
-                 // $res_file      = _gsb_box_fetch_file_details($token,$row["id"]);
-                  $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
-                 
-                  if(isset( $res_meta_data)) {
-                   _gsb_box_case_node_import($res_meta_data,$row,$token);
-                   $count ++;
-                  }
-               }
-            }
-        } 
-        else {
-          echo 'No files for create/update';
-        }
-                   
    }
    else
    {
@@ -348,7 +205,6 @@ function gsb_box_case_files_import_specificdate($params = array()) {
 /**
  * Function for fetching Box folder data
  */
-
 function _gsb_box_get_folder_data($token, $limit, $offset) {
 
     $options = array(
@@ -454,10 +310,6 @@ function gsb_box_download_box_doc($node) {
     }
     drupal_add_http_header('Cache-Control', 'no-cache, must-revalidate');
     drupal_add_http_header('Content-type', 'application/pdf');
-    //drupal_add_http_header('Content-type', $object->properties['cmis:contentStreamMimeType']);
-    //if ($object->properties['cmis:contentStreamMimeType'] != 'text/html') {
-    //drupal_add_http_header('Content-Disposition', 'attachment; filename="'. $filename .'"');
-    //}
     drupal_add_http_header('Content-Disposition', 'attachment; filename="'. $filename .'"');
     print($content->data);
     exit();
@@ -1144,9 +996,9 @@ function gsb_box_working_paper_file_upload($node) {
   $filename = $filename.".pdf"; 
   else
   $filename = $filename.".pdf"; 
-  $file_empty_flag = false;
+  $file_empty_flag = 1;
   if(empty($file)) {
-    $file_empty_flag = true;
+    $file_empty_flag = 0;
     global $user;
     $uri = 'public://box-place-holder.pdf';
     $file = new stdClass;
@@ -1204,7 +1056,7 @@ function gsb_box_working_paper_file_upload($node) {
     return false;
   }
    // remove file from the Drupal system
-  if (!empty($file) && $file_empty_flag == false) {
+  if (!empty($file) && $file_empty_flag == 1) {
       $usage = file_usage_list($file);
       if (!empty($usage)) {
         if (count($usage['file']['node']) == 1 && !empty($usage['file']['node'][$node->nid])) {
@@ -1382,12 +1234,10 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
 
 function gsb_box_case_alresco_node_update( ) {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "2017-10-17-case-mapping.csv"; 
+    $csv_file    = "csv/2017-10-17-case-mapping.csv"; 
     $file_path   = $module_path."/".$csv_file;
-    //echo $file_path;
     $content = array();
     $matching_node_ids = $matching_node_ids1 = array();
-    $count = 1;
     if ( $handle = fopen($file_path, 'r') ) {
         $line = fgetcsv($handle, 4096);
         $count = 1;
@@ -1439,8 +1289,7 @@ function gsb_box_case_alresco_node_update( ) {
                       $content[] = $line;
                   }
               }
-             
-           }
+          }
         }  
       
         fclose($handle);
@@ -1468,7 +1317,7 @@ function gsb_box_case_alresco_node_update( ) {
                                'file_name'=> $file_name);
         }
          header('Content-type: text/csv');
-         header('Content-Disposition: attachment; filename="result.csv"');
+         header('Content-Disposition: attachment; filename="case-node-result.csv"');
          header('Pragma: no-cache');
          header('Expires: 0');
          $file = fopen('php://output', 'w');
@@ -1485,9 +1334,8 @@ function gsb_box_case_alresco_node_update( ) {
 
 function gsb_box_case_working_paper_node_update( ) {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "2017-10-27-working-paper.csv"; 
+    $csv_file    = "csv/2017-10-27-working-paper.csv"; 
     $file_path   = $module_path."/".$csv_file;
-    //echo $file_path;
     $content = array();
     $matching_node_ids = $matching_node_ids1 = array();
     $count = 1;
@@ -1500,8 +1348,6 @@ function gsb_box_case_working_paper_node_update( ) {
               $item_data = array();
               $item_data = (explode(".",$line[0]));
               $item_id   = substr($item_data[0], 2);
-              //echo "item id ". $item_id;
-              //echo "<br/>";
               $line[1] = str_replace('workspace://SpacesStore/', 'urn:uuid:', $line[1]);
               $query = db_select('node', 'n');
               $query->fields('n', array('nid','title'));
@@ -1514,14 +1360,11 @@ function gsb_box_case_working_paper_node_update( ) {
               $data    = $results->fetchAll();
               if(isset($data[0]) && !empty($data[0]))
               {
-                   //echo "Document uuid- ".$line[1]." File id -".$line[2];
-                   //echo "<br/>";
                    $matching_node_ids[] = $data[0]->nid;
                    $node    = node_load($data[0]->nid);
                    $wrapper = entity_metadata_wrapper('node', $node);
                    $wrapper->field_document_uuid->set(trim($line[2]) );
                    $wrapper->save();
-         
               }
               else 
               {
@@ -1596,7 +1439,7 @@ function gsb_box_case_working_paper_node_update( ) {
 function gsb_box_case_node_update_box_id()
 {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "Box-file-ids-update-for-Case-Node.csv"; 
+    $csv_file    = "csv/Box-file-ids-update-for-Case-Node.csv"; 
     $file_path   = $module_path."/".$csv_file;
     $content = array();
     $matching_node_ids = $matching_node_ids1 = array();
@@ -1625,10 +1468,9 @@ function gsb_box_case_node_update_box_id()
 
 function gsb_box_case_node_no_box_file_ids( )
 {
-  $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "Case-Node-With-Box-file-ids-consolidated-list-2017-11-27.csv"; 
+    $module_path = drupal_get_path('module', 'gsb_box');
+    $csv_file    = "csv/Case-Node-With-Box-file-ids-consolidated-list.csv"; 
     $file_path   = $module_path."/".$csv_file;
-    //echo $file_path;
     $content = array();
     $matching_node_ids = array();
     if ( $handle = fopen($file_path, 'r') ) {
@@ -1696,7 +1538,7 @@ function gsb_box_case_node_no_box_file_ids( )
 
 function gsb_box_working_paper_node_update_final( ) {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "2017-12-05-working-paper.csv"; 
+    $csv_file    = "csv/2017-12-05-working-paper.csv"; 
     $file_path   = $module_path."/".$csv_file;
     $content = array();
     $matching_node_ids = $matching_node_ids1 = array();
@@ -1704,14 +1546,11 @@ function gsb_box_working_paper_node_update_final( ) {
     if ( $handle = fopen($file_path, 'r') ) {
         $line = fgetcsv($handle, 4096);
         while ( $line = fgetcsv($handle, 4096) ) {
-           
            if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
            {
               $item_data = array();
               $item_data = (explode(".",$line[0]));
               $item_id   = substr($item_data[0], 2);
-              //echo "item id ". $item_id;
-              //echo "<br/>";
               $line[1] = str_replace('workspace://SpacesStore/', 'urn:uuid:', $line[1]);
               $query = db_select('node', 'n');
               $query->fields('n', array('nid','title'));
@@ -1746,7 +1585,7 @@ function gsb_box_working_paper_node_update_final( ) {
 function gsb_box_wp_node_no_box_file_ids( )
 {
     $module_path = drupal_get_path('module', 'gsb_box');
-    $csv_file    = "working-paper-consolidated.csv"; 
+    $csv_file    = "csv/working-paper-consolidated.csv"; 
     $file_path   = $module_path."/".$csv_file;
     $content = array();
     $matching_node_ids = array();
