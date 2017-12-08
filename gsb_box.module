@@ -966,6 +966,10 @@ function  _gsb_box_getAuthorProperties($node) {
  */
 
 function gsb_box_working_paper_file_upload($node) {
+
+  if(empty($node) )
+  return false;
+
   global $conf;
   $language = $node->language;
   $working_paper_folder = trim(variable_get('box_workingpaper_folder_id'));
@@ -1166,6 +1170,13 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
       $bi_topic_term = taxonomy_term_load($bi_topic_tid);
       $cwoBusinessTopics = $bi_topic_term->name;
     }
+    $centersInitiativesInstitutes = '';
+    if (!empty($node->field_centers_research_programs[$language][0])) {
+      $ci_topic_tid = $node->field_centers_research_programs[$language][0]['tid'];
+      $ci_topic_term = taxonomy_term_load($ci_topic_tid);
+      $centersInitiativesInstitutes = $ci_topic_term->name;
+    }
+
     $json = array(
                   'title' => $node->title, 
                   'itemId1' => (string)$node->field_item_id[$language][0]['value']
@@ -1186,6 +1197,8 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
     $json['academicArea2'] = $cwoAcademicArea;
     if($cwoBusinessTopics != "")
     $json['businessTopics1'] = $cwoBusinessTopics;
+    if($centersInitiativesInstitutes != "")
+    $json['centersInitiativesInstitutes'] = $centersInitiativesInstitutes;
    
     $json_encode = json_encode($json);
     //qry = http_build_query($json, '', '&');
@@ -1196,6 +1209,7 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
                     'Authorization' => 'Bearer '.$token),
                     );
     $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$file_id.'/metadata/enterprise_86433/gsbitops',$options2);
+
     if($response_data->status_message == 'Conflict' &&  $response_data->code == '409') {
        
        $qry_data = '[{"op":"add","path":"/title","value":"'.$node->title.'"}';
@@ -1205,17 +1219,31 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
        $qry_data .=   ',{"op":"add","path":"/author","value":"'.implode(', ', $authors).'"}';
        if(!empty($authorSunetIds))
        $qry_data .=   ',{"op":"add","path":"/authorsSunetidCommaSeparatedForMultipleAuthors","value":"'.implode(', ', $authorSunetIds).'"}';
+       else
+       $qry_data .=   ',{"op":"add","path":"/authorsSunetidCommaSeparatedForMultipleAuthors","value":""}';
+
        if($cwoAcademicArea != "")
        $qry_data .=   ',{"op":"add","path":"/academicArea2","value":"'.$cwoAcademicArea.'"}';
+       else
+       $qry_data .=   ',{"op":"remove","path":"/academicArea2"}';
+
        if($cwoBusinessTopics != "")
        $qry_data .=   ',{"op":"add","path":"/businessTopics1","value":"'.$cwoBusinessTopics.'"}';
+       else
+       $qry_data .=   ',{"op":"remove","path":"/businessTopics1"}';
+
+       if($centersInitiativesInstitutes != "")
+       $qry_data .=   ',{"op":"add","path":"/centersInitiativesInstitutes","value":"'.$centersInitiativesInstitutes.'"}';
+       else
+       $qry_data .=   ',{"op":"remove","path":"/centersInitiativesInstitutes"}';
+
        if(!empty($node->field_description[$language][0]['value'])){
           $abstract = str_replace("\r\n",'', $node->field_description[$language][0]['value']);
           $abstract = str_replace("\n",'', $abstract);
           $abstract = str_replace("\r",'', $abstract);
+          $abstract = str_replace("&nbsp;",' ', $abstract);
           $qry_data .=   ',{"op":"add","path":"/abstract","value":"'.strip_tags(trim($abstract)).'"}';
        }
-       
        $qry_data .= ']';
        // $qry = http_build_query($qry_data, '', '&');
        $options3 = array(
