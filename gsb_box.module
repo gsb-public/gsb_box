@@ -1001,7 +1001,7 @@ function gsb_box_working_paper_file_upload($node) {
   else
   $filename = $filename.".pdf"; 
   $file_empty_flag = 1;
-  if(empty($file)) {
+  if(empty($file) && $uuid == -1) {
     $file_empty_flag = 0;
     global $user;
     $uri = 'public://box-place-holder.pdf';
@@ -1012,6 +1012,7 @@ function gsb_box_working_paper_file_upload($node) {
     $file->filemime = 'application/pdf';
     $file->filesize = filesize($uri);
     $file->status = 1;
+    $node->field_has_pdf[$language][0]['value'] = '1';
   }
   else {
     $node->field_has_pdf[$language][0]['value'] = '1';
@@ -1245,7 +1246,6 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
           $qry_data .=   ',{"op":"add","path":"/abstract","value":"'.strip_tags(trim($abstract)).'"}';
        }
        $qry_data .= ']';
-       // $qry = http_build_query($qry_data, '', '&');
        $options3 = array(
                       'method'  => 'PUT',
                       'data'    =>  $qry_data,
@@ -1291,35 +1291,8 @@ function gsb_box_case_alresco_node_update( ) {
                    $wrapper->save();
 
               }
-              else 
-              {
-                  
-                  $query1 = db_select('node', 'n');
-                  $query1->fields('n', array('type', 'nid'));
-                  $query1->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
-                  $query1->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
-                  $query1->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
-                  $query1->fields('fdfdn', array('entity_id', 'field_document_name_value'));
-                  $query1->condition('n.type', 'case');
-                  $db_or = db_or();
-                  $db_or->condition('fdfdu.field_document_uuid_value', $line[1], '=');
-                  $db_or->condition('fdfdn.field_document_name_value', $line[0], '=');
-                  $query1->condition($db_or);
-                  $results1 = $query1->execute();
-                  $data1    = $results1->fetchAll();
-                  if(isset($data1[0]) && !empty($data1[0]))
-                  {
-                     $content[] = $line;
-                           
-                  }
-                  else
-                  {
-                      $content[] = $line;
-                  }
-              }
-          }
+           }
         }  
-      
         fclose($handle);
         $query2 = db_select('node', 'n');
         $query2->fields('n', array('nid','title'));
@@ -1368,9 +1341,9 @@ function gsb_box_case_working_paper_node_update( ) {
     $matching_node_ids = $matching_node_ids1 = array();
     $count = 1;
     if ( $handle = fopen($file_path, 'r') ) {
-        $line = fgetcsv($handle, 4096);
+        //$line = fgetcsv($handle, 4096);
         while ( $line = fgetcsv($handle, 4096) ) {
-           
+      
            if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
            {
               $item_data = array();
@@ -1389,38 +1362,17 @@ function gsb_box_case_working_paper_node_update( ) {
               if(isset($data[0]) && !empty($data[0]))
               {
                    $matching_node_ids[] = $data[0]->nid;
-                   $node    = node_load($data[0]->nid);
-                   $wrapper = entity_metadata_wrapper('node', $node);
-                   $wrapper->field_document_uuid->set(trim($line[2]) );
-                   $wrapper->save();
+                   echo "Document Name-  ".$line[0]."   Document uuid- ".$line[1]."  - File ID- ".$line[2]." Node ID- ".$data[0]->nid;
+                   $num_updated = db_update('field_data_field_document_uuid')
+                                           ->fields(array('field_document_uuid_value' => $line[2]))
+                                           ->condition('entity_id', $data[0]->nid,'=')
+                                           ->execute();
+                    if($num_updated)
+                    echo " Success";
+                    else
+                    echo " Fail";  
+                    echo "<br/>"; 
               }
-              else 
-              {
-                  
-                  $query1 = db_select('node', 'n');
-                  $query1->fields('n', array('type', 'nid'));
-                  $query1->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
-                  $query1->join('field_data_field_item_id', 'fdfdn', "n.nid = fdfdn.entity_id");
-                  $query1->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
-                  $query1->fields('fdfdn', array('entity_id', 'field_item_id_value'));
-                  $query1->condition('n.type', 'working_paper');
-                  $db_or = db_or();
-                  $db_or->condition('fdfdu.field_document_uuid_value', $line[1], '=');
-                  $db_or->condition('fdfdn.field_item_id_value', $item_id, '=');
-                  $query1->condition($db_or);
-                  $results1 = $query1->execute();
-                  $data1    = $results1->fetchAll();
-                  if(isset($data1[0]) && !empty($data1[0]))
-                  {
-                     $content[] = $line;
-                           
-                  }
-                  else
-                  {
-                      $content[] = $line;
-                  }
-              }
-             
            }
         }  
       
@@ -1473,7 +1425,7 @@ function gsb_box_case_node_update_box_id()
     $matching_node_ids = $matching_node_ids1 = array();
     $count = 1;
     if ( $handle = fopen($file_path, 'r') ) {
-        $line = fgetcsv($handle, 4096);
+        //$line = fgetcsv($handle, 4096);
         $count = 1;
         while ( $line = fgetcsv($handle, 4096) ) {
            if(!empty($line[0]) && !empty($line[3]))
@@ -1499,10 +1451,9 @@ function gsb_box_case_node_no_box_file_ids( )
     $module_path = drupal_get_path('module', 'gsb_box');
     $csv_file    = "csv/Case-Node-With-Box-file-ids-consolidated-list.csv"; 
     $file_path   = $module_path."/".$csv_file;
-    $content = array();
     $matching_node_ids = array();
     if ( $handle = fopen($file_path, 'r') ) {
-        $line = fgetcsv($handle, 4096);
+        //$line = fgetcsv($handle, 4096);
         $count = 1;
         while ( $line = fgetcsv($handle, 4096) ) {
            if(!empty($line[2]))
@@ -1572,7 +1523,7 @@ function gsb_box_working_paper_node_update_final( ) {
     $matching_node_ids = $matching_node_ids1 = array();
     $count = 1;
     if ( $handle = fopen($file_path, 'r') ) {
-        $line = fgetcsv($handle, 4096);
+        //$line = fgetcsv($handle, 4096);
         while ( $line = fgetcsv($handle, 4096) ) {
            if(!empty($line[0]) && !empty($line[1]) && !empty($line[2]))
            {
@@ -1589,15 +1540,19 @@ function gsb_box_working_paper_node_update_final( ) {
               $query->condition('fdfdn.field_item_id_value', $item_id);
               $results = $query->execute();
               $data    = $results->fetchAll();
+
               if(isset($data[0]) && !empty($data[0]))
               {
-                   echo "Document uuid- ".$line[1]." File id -".$line[2]." Node id - ".$data[0]->nid;
-                   echo "<br/>";
-                   $matching_node_ids[] = $data[0]->nid;
-                   $node    = node_load($data[0]->nid);
-                   $wrapper = entity_metadata_wrapper('node', $node);
-                   $wrapper->field_document_uuid->set(trim($line[2]) );
-                   $wrapper->save();
+                   echo "Document Name-  ".$line[0]."   Document uuid- ".$line[1]."  - File ID- ".$line[2]." Node ID- ".$data[0]->nid;
+                   $num_updated = db_update('field_data_field_document_uuid')
+                                           ->fields(array('field_document_uuid_value' => $line[2]))
+                                           ->condition('entity_id', $data[0]->nid,'=')
+                                           ->execute();
+                    if($num_updated)
+                    echo " Success";
+                    else
+                    echo " Fail";  
+                    echo "<br/>";
          
               }
                
@@ -1615,10 +1570,9 @@ function gsb_box_wp_node_no_box_file_ids( )
     $module_path = drupal_get_path('module', 'gsb_box');
     $csv_file    = "csv/working-paper-consolidated.csv"; 
     $file_path   = $module_path."/".$csv_file;
-    $content = array();
     $matching_node_ids = array();
     if ( $handle = fopen($file_path, 'r') ) {
-        $line = fgetcsv($handle, 4096);
+        //$line = fgetcsv($handle, 4096);
         while ( $line = fgetcsv($handle, 4096) ) {
            if(!empty($line[2]))
            {
