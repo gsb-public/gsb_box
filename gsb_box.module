@@ -1012,11 +1012,9 @@ function gsb_box_working_paper_file_upload($node) {
     $file->filemime = 'application/pdf';
     $file->filesize = filesize($uri);
     $file->status = 1;
-    $node->field_has_pdf[$language][0]['value'] = '1';
+    $node->field_has_pdf[$language][0]['value'] = '0';
   }
-  else {
-    $node->field_has_pdf[$language][0]['value'] = '1';
-  }
+ 
   
   $box_object = null;
   // check if we already have a document/uuid on Box
@@ -1062,6 +1060,7 @@ function gsb_box_working_paper_file_upload($node) {
   }
    // remove file from the Drupal system
   if (!empty($file) && $file_empty_flag == 1) {
+      $node->field_has_pdf[$language][0]['value'] = '1';
       $usage = file_usage_list($file);
       if (!empty($usage)) {
         if (count($usage['file']['node']) == 1 && !empty($usage['file']['node'][$node->nid])) {
@@ -1070,6 +1069,9 @@ function gsb_box_working_paper_file_upload($node) {
       } else {
         file_delete($file);
       }
+  }
+  else if($file_empty_flag == 0 && $uuid == -1) {
+    $node->field_has_pdf[$language][0]['value'] = '0';
   }
   
   return true;
@@ -1147,12 +1149,8 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
  
   $token = gsb_box_get_access_token();
   if ($token != "Error JWT Token") {
-    $options1 = array(
-                      'method' => 'GET',
-                      'headers' => array('Content-Type' => 'application/x-www-form-urlencoded',
-                      'Authorization' => 'Bearer '.$token),
-                      );
-    $language = $node->language;
+
+     $language = $node->language;
      $authorSunetIds = array();
      $authors = array();
      if (!empty($node->field_authors[$language][0])) {
@@ -1202,7 +1200,6 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
     $json['centersInitiativesInstitutes'] = $centersInitiativesInstitutes;
    
     $json_encode = json_encode($json);
-    //qry = http_build_query($json, '', '&');
     $options2 = array(
                     'method' => 'POST',
                     'data'    => $json_encode,
@@ -1210,9 +1207,13 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
                     'Authorization' => 'Bearer '.$token),
                     );
     $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$file_id.'/metadata/enterprise_86433/gsbitops',$options2);
+    watchdog('Metdata condn 1 - Request:', $response_data->request);
+    watchdog('Metdata condn 1 - Data:', $response_data->data);
+    watchdog('Metdata condn 1 - Message:', $response_data->status_message);
 
     if($response_data->status_message == 'Conflict' &&  $response_data->code == '409') {
-       
+
+       $meta_data = _gsb_box_fetch_file_meta_details($token,$file_id);       
        $qry_data = '[{"op":"add","path":"/title","value":"'.$node->title.'"}';
        if($node->field_year_of_publication[$language][0]['value'] != "")
        $qry_data .=  ',{"op":"add","path":"/publicationYear","value":"'.substr($node->field_year_of_publication[$language][0]['value'],0,4).'"}';
@@ -1225,18 +1226,21 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
 
        if($cwoAcademicArea != "")
        $qry_data .=   ',{"op":"add","path":"/academicArea2","value":"'.$cwoAcademicArea.'"}';
-       else
-       $qry_data .=   ',{"op":"remove","path":"/academicArea2"}';
+       else if ( isset($meta_data['entries'][0]['academicArea2']) && !empty($meta_data['entries'][0]['academicArea2']) ){
+          $qry_data .=   ',{"op":"remove","path":"/academicArea2"}';
+       }
 
        if($cwoBusinessTopics != "")
        $qry_data .=   ',{"op":"add","path":"/businessTopics1","value":"'.$cwoBusinessTopics.'"}';
-       else
+       else if (isset($meta_data['entries'][0]['businessTopics1']) && !empty($meta_data['entries'][0]['businessTopics1'])) {
        $qry_data .=   ',{"op":"remove","path":"/businessTopics1"}';
+       }
 
        if($centersInitiativesInstitutes != "")
        $qry_data .=   ',{"op":"add","path":"/centersInitiativesInstitutes","value":"'.$centersInitiativesInstitutes.'"}';
-       else
+       else if ( isset($meta_data['entries'][0]['centersInitiativesInstitutes']) && !empty($meta_data['entries'][0]['centersInitiativesInstitutes']) ){
        $qry_data .=   ',{"op":"remove","path":"/centersInitiativesInstitutes"}';
+       }
 
        if(!empty($node->field_description[$language][0]['value'])){
           $abstract = str_replace("\r\n",'', $node->field_description[$language][0]['value']);
@@ -1253,6 +1257,9 @@ function _gsb_box_create_update_meta_data($node,$file,$file_id) {
                       'Authorization' => 'Bearer '.$token),
                       );
        $response_data1 = drupal_http_request('https://api.box.com/2.0/files/'.$file_id.'/metadata/enterprise_86433/gsbitops',$options3);
+       watchdog('Metdata condn 2 - Request:', $response_data1->request);
+       watchdog('Metdata condn 2 - Data:', $response_data1->data);
+       watchdog('Metdata condn 2 - Message:', $response_data1->status_message);
       
     }
     return true;
