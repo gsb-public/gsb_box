@@ -1794,8 +1794,7 @@ function gsb_box_wp_node_no_box_file_ids( )
 //fetching working paper files with date range for to update old version
 function gsb_box_fetch_working_paper_files($params = array()) {
  
-  //$token = gsb_box_get_access_token();
-  $token = "hPDwYYGev8EVTK7kMcE4L3dXVILVeqP6";
+  $token = gsb_box_get_access_token();
   if ($token != "Error JWT Token") {
        $options = array(
                         'method' => 'GET',
@@ -1894,8 +1893,7 @@ function _gsb_box_get_wp_folder_data($token, $limit, $offset) {
 
 function gsb_box_wp_node_fetch_file_versions( )
 {
-    //$token = gsb_box_get_access_token();
-    $token = "";
+    $token = gsb_box_get_access_token();
     $module_path = drupal_get_path('module', 'gsb_box');
     $csv_file    = "csv/wp-nodes-to-update-version10.csv"; 
     $file_path   = $module_path."/".$csv_file;
@@ -1947,8 +1945,7 @@ function gsb_box_wp_node_fetch_file_versions( )
 
 function gsb_box_wp_revert_box_file_versions( )
 {
-    //$token = gsb_box_get_access_token();
-    $token = "";
+    $token = gsb_box_get_access_token();
     $file_id = "";
     $file_version = _gsb_box_get_wp_file_version($token, $file_id);
     if($file_version['total_count'] == 1)
