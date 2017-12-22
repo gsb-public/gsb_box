@@ -352,12 +352,12 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     }
 
     $uuid = "";
-    if (!empty($meta_data['entries'][0]['$id']) && trim( $meta_data['entries'][0]['$id']) != '') {
+    /*if (!empty($meta_data['entries'][0]['$id']) && trim( $meta_data['entries'][0]['$id']) != '') {
        $uuid = $meta_data['entries'][0]['$id'];
     }
     else{
       return;
-    }
+    }*/
 
     $fileid = "";
     if (!empty($main_data['id']) && trim( $main_data['id']) != '') {
@@ -367,8 +367,13 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
       return;
     }
     // Attempt to find a node with the document uuid
-    $query = new EntityFieldQuery();
+    /*$query = new EntityFieldQuery();
     $query->fieldCondition('field_document_uuid', 'value', $uuid, '=')->range(0, 1);
+    $entities = $query->execute();*/
+
+    // Attempt to find a node with the box file id
+    $query = new EntityFieldQuery();
+    $query->fieldCondition('field_instance_text', 'value', $fileid, '=')->range(0, 1);
     $entities = $query->execute();
 
     if (!empty($entities['node'])) {
@@ -409,11 +414,10 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
    
     $ewrapper = entity_metadata_wrapper('node', $node);
 
-    // _gsb_box_log('writing document uuid', 'success');
-    $ewrapper->field_document_uuid->set($uuid);
-
+   //_gsb_box_log('writing document uuid', 'success');
+   //$ewrapper->field_document_uuid->set($uuid);
    
-    //$ewrapper->field_box_file_id->set($fileid);
+    //Setting box file id
     $ewrapper->field_instance_text->set($fileid);
    
     //_gsb_box_log('writing title', 'success');
