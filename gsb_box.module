@@ -36,60 +36,6 @@ function gsb_box_menu() {
       'page arguments' => array('gsb_box_get_box_doc', 2, 3),
       'access callback' => TRUE,
     );
-    $items['gsb-box-case-alfresco-node-update'] = array(
-        'title' => 'GSB BOX - Case Node Update',
-        'description' => '',
-        'page callback' => 'gsb_box_case_alresco_node_update',
-        'access arguments' => array('administer box'),
-    );
-     $items['gsb-box-case-node-update-batch-one'] = array(
-        'title' => 'GSB BOX - Case Node Update',
-        'description' => '',
-        'page callback' => 'gsb_box_case_node_update_one',
-        'access arguments' => array('administer box'),
-    );
-      $items['gsb-box-case-node-update-batch-two'] = array(
-        'title' => 'GSB BOX - Case Node Update',
-        'description' => '',
-        'page callback' => 'gsb_box_case_node_update_three',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-node-update-batch-final'] = array(
-        'title' => 'GSB BOX - Case Node Update',
-        'description' => '',
-        'page callback' => 'gsb_box_case_node_update_two',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-wp-node-update'] = array(
-        'title' => 'GSB BOX - Working Paper Node Update ',
-        'description' => '',
-        'page callback' => 'gsb_box_case_working_paper_node_update',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-node-update-box-id'] = array(
-        'title' => 'GSB BOX - Case Node Update Box File ID',
-        'description' => '',
-        'page callback' => 'gsb_box_case_node_update_box_id',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-node-with-no-box-ids'] = array(
-        'title' => 'GSB BOX - Case Node Update Box File ID',
-        'description' => '',
-        'page callback' => 'gsb_box_case_node_no_box_file_ids',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-wp-node-update-final'] = array(
-        'title' => 'GSB BOX - WP Node Update with Box File ID',
-        'description' => '',
-        'page callback' => 'gsb_box_working_paper_node_update_final',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-wp-node-with-no-box-ids'] = array(
-        'title' => 'GSB BOX - WP Node without Box File ID',
-        'description' => '',
-        'page callback' => 'gsb_box_wp_node_no_box_file_ids',
-        'access arguments' => array('administer box'),
-    );
     $items['gsb-box-fetch-wp'] = array(
         'title' => 'GSB BOX - WP Node without Box File ID',
         'description' => '',
@@ -1331,39 +1277,7 @@ function gsb_box_case_alresco_node_update( ) {
         echo "<pre>";
         print_r($result_array);
         echo "</pre>";
-      /*$query2 = db_select('node', 'n');
-        $query2->fields('n', array('nid','title'));
-        $query2->join('field_data_field_document_uuid', 'fdfdu', "n.nid = fdfdu.entity_id");
-        $query2->join('field_data_field_document_name', 'fdfdn', "n.nid = fdfdn.entity_id");
-        $query2->fields('fdfdu', array('entity_id', 'field_document_uuid_value'));
-        $query2->fields('fdfdn', array('entity_id', 'field_document_name_value'));
-        $query2->condition('n.type', 'case');
-        $results2 = $query2->execute();
-        $data2    = $results2->fetchAll();
-        $unmatching_node_ids = $unmatching_node_ids1 =array();
-        foreach($data2 as $row) {
-            $unmatching_node_ids[]  =  $row->nid;
-            $unmatching_node_ids1[$row->nid] = array($row->title,$row->field_document_name_value);
-        }
-        $differents_array = array_diff($unmatching_node_ids, $matching_node_ids);
-        foreach($differents_array as $row1){
-           $title = $unmatching_node_ids1[$row1][0];
-           $file_name = $unmatching_node_ids1[$row1][1];
-           $result_array[]  = array('nid' => $row1,
-                               'title' => $title,
-                               'file_name'=> $file_name);
-        }*/
-       
-         /*header('Content-type: text/csv');
-         header('Content-Disposition: attachment; filename="case-node-result.csv"');
-         header('Pragma: no-cache');
-         header('Expires: 0');
-         $file = fopen('php://output', 'w');
-         foreach ($result_array as $row)
-         {
-           fputcsv($file, $row);
-         }*/
-           
+                
     }
     else {
       echo 'Unable to read uploaded file !filepath '.$file_path ;
@@ -1844,15 +1758,13 @@ function gsb_box_fetch_working_paper_files($params = array()) {
              header('Expires: 0');
              $file = fopen('php://output', 'w');
             foreach($folder_data['entries'] as $row) {
-              //if($row['type'] == 'file' && $row['modified_by']['id'] =='280540717' && $row['modified_by']['name'] =='vijayanv') {
-              if($row['type'] == 'file') {
+                if($row['type'] == 'file') {
                 
                   $row = array('id'=> $row['id'],
                                 'name'=>$row['name']);
                   $modified_records[] =  $row;
                   fputcsv($file, $row);
-                  //print_r($modified_records);
-                 // exit;
+  
                }
           }
        } 
