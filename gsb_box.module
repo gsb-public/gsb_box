@@ -158,13 +158,13 @@ function gsb_box_case_files_import_bydate($params = array()) {
             }
         } 
         else {
-          echo 'No files avilable for to create/update!';
-          drupal_set_message('No files avilable for to create/update!');
+          echo 'No Box case files avilable for to create/update!';
+          drupal_set_message('No Box case files avilable for to create/update!');
         }
    }
    else
    {
-      drupal_set_message('JWT Token has not generated!');
+      drupal_set_message('Box JWT Token has not generated!');
    }
   
 }
@@ -290,21 +290,19 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     if ($product_type != 'Case') {
       return;
     }
-
-    // get the cwoAccess property, assume default of 'Not for distribution'
-    $case_access = 'Not for distribution';
+    //Box enterprise id
+    $enterprise_id = "enterprise_".trim(variable_get('box_enterprise_id'));
+    //fetching case access field values
+    $all_fields         = field_info_fields();
+    $case_access_values = list_allowed_values($all_fields["field_case_access"]);
+    // setting default value of case access is 'Not for distribution'
+    $case_access = trim($case_access_values['Not for distribution']);
     if (!empty($meta_data['entries'][0]['caseStudyAccess1']) && trim($meta_data['entries'][0]['caseStudyAccess1']) != '') {
-      $case_access = $meta_data['entries'][0]['caseStudyAccess1'];
+      $case_access = trim($meta_data['entries'][0]['caseStudyAccess1']);
     }
 
     $uuid = "";
-    /*if (!empty($meta_data['entries'][0]['$id']) && trim( $meta_data['entries'][0]['$id']) != '') {
-       $uuid = $meta_data['entries'][0]['$id'];
-    }
-    else{
-      return;
-    }*/
-
+   
     $fileid = "";
     if (!empty($main_data['id']) && trim( $main_data['id']) != '') {
        $fileid = $main_data['id'];
@@ -312,10 +310,6 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     else {
       return;
     }
-    // Attempt to find a node with the document uuid
-    /*$query = new EntityFieldQuery();
-    $query->fieldCondition('field_document_uuid', 'value', $uuid, '=')->range(0, 1);
-    $entities = $query->execute();*/
 
     // Attempt to find a node with the box file id
     $query = new EntityFieldQuery();
@@ -327,9 +321,11 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
       $nids = array_keys($entities['node']);
       $node = node_load(array_shift($nids));
     } else {
-      // a node doesn't exist
+      // if a case node doesn't exist
       // we do not import(create) Cases that are marked as 'Not for distribution'
-      if ($case_access == 'Not for distribution') {
+      if (strtolower($case_access) == strtolower(trim($case_access_values['Not for distribution'])) ) {
+        _gsb_box_log('Case Node not able to create with case access value - Not for distribution and Box File ID: '.$fileid , 'success');
+        echo 'Case Node not able to create with case access value - Not for distribution and Box File ID: '.$fileid;        
         return;
       }
 
@@ -349,9 +345,21 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
       return;
     }
 
-    if ($case_access == 'Not for distribution') {
-      // delete the node
+    if (strtolower($case_access) == strtolower(trim($case_access_values['Not for distribution']))) {
+      // delete case node
+      $nid = $node->nid;
       node_delete($node->nid);
+      echo 'Case Node deleted successfully with case access value - Not for distribution,  Box File ID: '.$fileid .' and Node ID: '.$nid;
+      _gsb_box_log('Case Node deleted successfully with case access value - Not for distribution,  Box File ID: '.$fileid .' and Node ID: '.$nid, 'success');
+      
+      $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
+      $options   = array(
+                    'method'  => 'PUT',
+                    'data'    =>  $qry_data,
+                    'headers' => array('Content-Type' => 'application/json-patch+json',
+                    'Authorization' => 'Bearer '.$token),
+                    );
+      $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
       return;
     }
 
@@ -617,15 +625,13 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     $node->workbench_moderation['updating_live_revision'] = 1;
     node_save($node);
     
-    // _gsb_box_log('Case node created/updated successfully with File ID:'.$fileid , 'success');
     echo "<br/>";
     echo "Case node created/updated successfully with File ID: ".$fileid." And Node ID: ".$node->nid;
     _gsb_box_log('Case node created/updated successfully with File ID : '.$fileid .' And Node ID: '.$node->nid, 'success');
     echo "<br/>";
-    //_gsb_box_log('Case node uuid : '.$uuid, 'success');
+   
     $enterprise_id = "enterprise_".trim(variable_get('box_enterprise_id'));
     $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
-
     $options   = array(
                     'method'  => 'PUT',
                     'data'    =>  $qry_data,
@@ -634,12 +640,12 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
                     );
     $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
     if($response_data->status_message == 'OK' &&  $response_data->code == '200') {
-        echo "Case file metadata updated with File ID: ".$fileid;
-       _gsb_box_log('Case file metadata updated with File ID: '.$fileid, 'success');
+        echo "Box file metadata field Publish set to default value for File ID: ".$fileid;
+       _gsb_box_log('Box file metadata field Publish set to default value for File ID: '.$fileid, 'success');
     }
     else {
-       echo "Case file metadata failed to update with File ID: ".$fileid;
-       _gsb_box_log('Case file metadata failed to update with File ID: '.$fileid, 'success');
+       echo "Box file metadata field Publish failed to update for File ID: ".$fileid;
+       _gsb_box_log('Box file metadata field Publish failed to update for File ID: '.$fileid, 'success');
     }
   
 }
