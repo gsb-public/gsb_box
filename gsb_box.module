@@ -390,9 +390,15 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
 
     //_gsb_box_log('writing field_case_access', 'success');
     if (!empty($meta_data['entries'][0]['caseStudyAccess1']) && trim($meta_data['entries'][0]['caseStudyAccess1']) != '') {
-      $ewrapper->field_case_access->set($meta_data['entries'][0]['caseStudyAccess1']);
+          if (strtolower($case_access) == strtolower(trim($case_access_values['Instructors only'])) ) 
+          $case_access = trim($case_access_values['Instructors only']);
+          else if (strtolower($case_access) == strtolower(trim($case_access_values['Educational use only'])) )
+          $case_access = trim($case_access_values['Educational use only']);
+          else
+          $case_access = trim($meta_data['entries'][0]['caseStudyAccess1']) ;
+        $ewrapper->field_case_access->set($case_access);
     } else {
-      $ewrapper->field_case_access->set('Not for distribution');
+        $ewrapper->field_case_access->set('Not for distribution');
     }
 
     //_gsb_box_log('writing field_year_of_publication', 'success');
