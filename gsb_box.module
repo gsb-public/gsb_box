@@ -500,15 +500,35 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     }
 
    // _gsb_box_log('writing field_citation', 'success');
-    $ewrapper->field_citation->set(NULL);
+     if (!empty($meta_data['entries'][0]['citation']) && trim($meta_data['entries'][0]['citation']) != '') {
+      $citation = $meta_data['entries'][0]['citation'];
+      $citation = str_replace('\n','<br/>',$citation);
+      $citation = stripslashes($citation);
+      $ewrapper->field_citation = array(
+        'value' => $citation,
+        'format' => 'gsb_wysiwyg_text',
+      );
+    } else {
+      $ewrapper->field_citation = array(
+        'value' => '',
+        'format' => 'gsb_wysiwyg_text',
+      );
+    }
  
    // _gsb_box_log('writing field_learning_objective', 'success');
     if (!empty($meta_data['entries'][0]['learningObjective']) && trim($meta_data['entries'][0]['learningObjective']) != '') {
       $learning = $meta_data['entries'][0]['learningObjective'];
-      $learning = str_replace('\n','',$learning);
-      $ewrapper->field_learning_objective->set($learning);
+      $learning = str_replace('\n','<br/>',$learning);
+      $learning = stripslashes($learning);
+      $ewrapper->field_learning_objective = array(
+        'value' => $learning,
+        'format' => 'gsb_wysiwyg_text',
+      );
     } else {
-      $ewrapper->field_learning_objective->set(NULL);
+      $ewrapper->field_learning_objective = array(
+        'value' => '',
+        'format' => 'gsb_wysiwyg_text',
+      );
     }
 
     //_gsb_box_log('writing field_page_count', 'success');
