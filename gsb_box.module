@@ -1992,8 +1992,8 @@ function gsb_box_case_all_files_import($params = array()) {
 
   foreach ($context['sandbox']['box_chunks'] as $box_data) {
     if (!empty($box_data)) {
-      // Import first limit of box files
-      // gsb_box_case_updates($event_id);
+      // Update drupal box related content type nodes //TODO:
+      //_gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token, FALSE);
       break;
     }
     $context['sandbox']['progress']++;
