@@ -9,40 +9,47 @@ date_default_timezone_set("UTC");
  * Implementation of hook_menu().
  */
 function gsb_box_menu() {
-    $items = array();
-    $items['admin/config/gsb/box'] = array(
-      'title' => 'GSB Box',
-      'page callback' => 'drupal_get_form',
-      'page arguments' => array('gsb_box_settings_form'),
-      'access arguments' => array('administer box'),
-      'file' => 'gsb_box.admin.inc',
-    );
-    $items['gsb-box-access-token'] = array(
-        'title' => 'GSB Box Access Token',
-        'description' => 'GSB Box Access Token',
-        'page callback' => 'gsb_box_get_access_token',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box-case-files-import-bydate'] = array(
-        'title' => 'GSB BOX - Case Node Files Import By Date ',
-        'description' => '',
-        'page callback' => 'gsb_box_case_files_import_bydate',
-        'access arguments' => array('administer box'),
-    );
-    $items['gsb-box/gsb-box-get-box-doc/%node/%'] = array(
-      'title' => 'Downloading document...',
-      'description' => 'Downloading document...',
-      'page callback' => 'drupal_get_form',
-      'page arguments' => array('gsb_box_get_box_doc', 2, 3),
-      'access callback' => TRUE,
-    );
-    $items['gsb-box-fetch-wp'] = array(
-        'title' => 'GSB BOX - WP Node without Box File ID',
-        'description' => '',
-        'page callback' => 'gsb_box_fetch_working_paper_files',
-        'access arguments' => array('administer box'),
-    );
-    return $items;
+  $items = [];
+  $items['admin/config/gsb/box'] = [
+    'title' => 'GSB Box',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['gsb_box_settings_form'],
+    'access arguments' => ['administer box'],
+    'file' => 'gsb_box.admin.inc',
+  ];
+  $items['gsb-box-access-token'] = [
+    'title' => 'GSB Box Access Token',
+    'description' => 'GSB Box Access Token',
+    'page callback' => 'gsb_box_get_access_token',
+    'access arguments' => ['administer box'],
+  ];
+  $items['gsb-box-case-files-import-bydate'] = [
+    'title' => 'GSB BOX - Case Node Files Import By Date ',
+    'description' => '',
+    'page callback' => 'gsb_box_case_files_import_bydate',
+    'access arguments' => ['administer box'],
+  ];
+  $items['gsb-box/gsb-box-get-box-doc/%node/%'] = [
+    'title' => 'Downloading document...',
+    'description' => 'Downloading document...',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['gsb_box_get_box_doc', 2, 3],
+    'access callback' => TRUE,
+  ];
+  $items['gsb-box-fetch-wp'] = [
+    'title' => 'GSB BOX - WP Node without Box File ID',
+    'description' => '',
+    'page callback' => 'gsb_box_fetch_working_paper_files',
+    'access arguments' => ['administer box'],
+  ];
+
+  $items['admin/config/gsb/box/import'] = [
+    'title' => 'Start Box Case Import',
+    'description' => 'GSB Box Import.',
+    'page callback' => 'gsb_box_case_batch_import',
+    'access arguments' => ['administer box'],
+  ];
+  return $items;
 }
 
 /**
@@ -282,7 +289,7 @@ function gsb_box_download_box_doc($node) {
     exit();
 }
 
-function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token) {
+function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token, $update_box = TRUE) {
 
     global $user;
     // Validating Product Types  'Case' Content type 
@@ -651,29 +658,29 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     $node->workbench_moderation['updating_live_revision'] = 1;
     node_save($node);
     
-    echo "<br/>";
-    echo "Case node created/updated successfully with File ID: ".$fileid." And Node ID: ".$node->nid;
-    _gsb_box_log('Case node created/updated successfully with File ID : '.$fileid .' And Node ID: '.$node->nid, 'success');
-    echo "<br/>";
-   
-    $enterprise_id = "enterprise_".trim(variable_get('box_enterprise_id'));
-    $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
-    $options   = array(
-                    'method'  => 'PUT',
-                    'data'    =>  $qry_data,
-                    'headers' => array('Content-Type' => 'application/json-patch+json',
-                    'Authorization' => 'Bearer '.$token),
-                    );
-    $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
-    if($response_data->status_message == 'OK' &&  $response_data->code == '200') {
-        echo "Box file metadata field Publish set to default value for File ID: ".$fileid;
-       _gsb_box_log('Box file metadata field Publish set to default value for File ID: '.$fileid, 'success');
+    if ($update_box) {
+      _gsb_box_log('Case node created/updated successfully with File ID : ' . $fileid . ' And Node ID: ' . $node->nid, 'success');
+
+      $enterprise_id = "enterprise_" . trim(variable_get('box_enterprise_id'));
+      $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
+      $options = [
+        'method' => 'PUT',
+        'data' => $qry_data,
+        'headers' => [
+          'Content-Type' => 'application/json-patch+json',
+          'Authorization' => 'Bearer ' . $token
+        ],
+      ];
+      $response_data = drupal_http_request('https://api.box.com/2.0/files/' . $fileid . '/metadata/' . $enterprise_id . '/gsbitops', $options);
+      if ($response_data->status_message == 'OK' && $response_data->code == '200') {
+        echo "Box file metadata field Publish set to default value for File ID: " . $fileid;
+        _gsb_box_log('Box file metadata field Publish set to default value for File ID: ' . $fileid, 'success');
+      }
+      else {
+        echo "Box file metadata field Publish failed to update for File ID: " . $fileid;
+        _gsb_box_log('Box file metadata field Publish failed to update for File ID: ' . $fileid, 'success');
+      }
     }
-    else {
-       echo "Box file metadata field Publish failed to update for File ID: ".$fileid;
-       _gsb_box_log('Box file metadata field Publish failed to update for File ID: '.$fileid, 'success');
-    }
-  
 }
 
 function _gsb_box_fetch_folder_details($access_token,$folder_id) {
@@ -1948,4 +1955,103 @@ function _gsb_box_get_wp_update_version($token, $file_id,$file_version) {
   }
   return $response;
 
+}
+
+/**
+ * The batch callback.
+ */
+function gsb_box_case_batch_import() {
+  $batch = [
+    'operations' => [],
+    'finished' => 'gsb_box_case_batch_import_finished',
+    'title' => t('Box Batch Import'),
+    'init_message' => t('Import is starting...'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('Import has encountered an error.')
+  ];
+
+  $batch['operations'][] = ['gsb_box_case_all_files_import', ["Box"]];
+
+  batch_set($batch);
+  batch_process('admin/content'); // The path to redirect to when done.
+}
+
+function gsb_box_case_all_files_import($params = array()) {
+
+  $limit = 50;
+  if (!isset($context['sandbox']['progress'])) {
+    $folder_data = _gsb_box_case_import_get_folder_data($context['sandbox']['offset'], $limit); //array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['max'] = $folder_data['total_count'];
+    $context['sandbox']['current_chunk'] = 0;
+  }
+
+  $context['sandbox']['box_chunks'] = $folder_data['entries'];
+  // Display a progress message...
+  //$current_chunk = $context['sandbox']['current_chunk'];
+
+  foreach ($context['sandbox']['box_chunks'] as $box_data) {
+    if (!empty($box_data)) {
+      // Import first limit of box files
+      // gsb_box_case_updates($event_id);
+      break;
+    }
+    $context['sandbox']['progress']++;
+  }
+
+  $context['sandbox']['offset'] += $limit;
+  //$context['sandbox']['box_chunks'] = _gsb_box_case_import_get_folder_data($context['sandbox']['offset'], $limit);
+  $context['message'] = "Now processed " . $context['sandbox']['progress'] . " out of " . $context['sandbox']['max'] . "..";
+  $context['sandbox']['current_chunk']++;
+
+  if ($context['sandbox']['progress'] < $context['sandbox'] ['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+function _gsb_box_case_import_get_folder_data($offset, $limit) {
+  $token = 'HQu5ySQY9zUxkjnp05O7X6bk33jcxKRR';
+
+  if ($token != "Error JWT Token") {
+    $options = [
+      'method' => 'GET',
+      'headers' => [
+        'Content-Type' => 'application/x-www-form-urlencoded',
+        'Authorization' => 'Bearer ' . $token
+      ],
+    ];
+
+    $box_case_folder_id = trim(variable_get('box_case_folder_id'));
+    $qry_data = [
+      'mdfilters' => '[{"templateKey":"gsbitops","scope":"enterprise_86433","filters":{"productType": "case"}}]',
+      'type' => 'file',
+      'file_extensions' => 'pdf',
+      'fields' => 'name,modified_at,created_at,metadata.enterprise_86433.gsbitops',
+      'ancestor_folder_ids' => $box_case_folder_id,
+    ];
+    $qry_data['offset'] = $offset;
+    $qry_data['limit'] = $limit;
+    $qry = http_build_query($qry_data, '', '&');
+    $response = drupal_http_request('https://api.box.com/2.0/search?' . $qry, $options);
+    $folder_data = drupal_json_decode($response->data); // Get total count
+
+    return $folder_data;
+  }
+}
+
+/**
+ * The batch finish handler.
+ */
+function gsb_box_case_batch_import_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message('Box import is complete!');
+  }
+  else {
+    $error_operation = reset($operations);
+    $message = t('An error occurred while processing %error_operation with arguments: @arguments', array(
+      '%error_operation' => $error_operation[0],
+      '@arguments' => print_r($error_operation[1], TRUE)
+    ));
+    drupal_set_message($message, 'error');
+  }
 }
