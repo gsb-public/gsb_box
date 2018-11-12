@@ -1976,21 +1976,21 @@ function gsb_box_case_batch_import() {
   batch_process('admin/content'); // The path to redirect to when done.
 }
 
-function gsb_box_case_all_files_import($params = array()) {
+function gsb_box_case_all_files_import($params = array(), &$context) {
 
   $limit = 50;
   if (!isset($context['sandbox']['progress'])) {
-    $folder_data = _gsb_box_case_import_get_folder_data($context['sandbox']['offset'], $limit); //array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    $folder_data = _gsb_box_case_import_get_folder_data(0, $limit);
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['max'] = $folder_data['total_count'];
+    $context['sandbox']['box_chunks'][0] = $folder_data['entries'];
     $context['sandbox']['current_chunk'] = 0;
   }
 
-  $context['sandbox']['box_chunks'] = $folder_data['entries'];
   // Display a progress message...
-  //$current_chunk = $context['sandbox']['current_chunk'];
+  $current_chunk = $context['sandbox']['current_chunk'];
 
-  foreach ($context['sandbox']['box_chunks'] as $box_data) {
+  foreach ($context['sandbox']['box_chunks'][$current_chunk] as $box_data) {
     if (!empty($box_data)) {
       // Update drupal box related content type nodes //TODO:
       //_gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token, FALSE);
@@ -2004,13 +2004,16 @@ function gsb_box_case_all_files_import($params = array()) {
   $context['message'] = "Now processed " . $context['sandbox']['progress'] . " out of " . $context['sandbox']['max'] . "..";
   $context['sandbox']['current_chunk']++;
 
+  $folder_data = _gsb_box_case_import_get_folder_data($context['sandbox']['offset'], $limit);
+  $context['sandbox']['box_chunks'][$context['sandbox']['current_chunk']] = $folder_data['entries'];
+
   if ($context['sandbox']['progress'] < $context['sandbox'] ['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
 }
 
 function _gsb_box_case_import_get_folder_data($offset, $limit) {
-  $token = 'HQu5ySQY9zUxkjnp05O7X6bk33jcxKRR';
+  $token = 'L2J1YVbkxCNAQF5IxfLr6VpBBiopt0US';
 
   if ($token != "Error JWT Token") {
     $options = [
