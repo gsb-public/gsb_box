@@ -1993,14 +1993,12 @@ function gsb_box_case_all_files_import($params = array(), &$context) {
   foreach ($context['sandbox']['box_chunks'][$current_chunk] as $box_data) {
     if (!empty($box_data)) {
       // Update drupal box related content type nodes //TODO:
-      //_gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token, FALSE);
-      break;
+      _gsb_box_case_update($box_data);
     }
     $context['sandbox']['progress']++;
   }
 
   $context['sandbox']['offset'] += $limit;
-  //$context['sandbox']['box_chunks'] = _gsb_box_case_import_get_folder_data($context['sandbox']['offset'], $limit);
   $context['message'] = "Now processed " . $context['sandbox']['progress'] . " out of " . $context['sandbox']['max'] . "..";
   $context['sandbox']['current_chunk']++;
 
@@ -2013,7 +2011,7 @@ function gsb_box_case_all_files_import($params = array(), &$context) {
 }
 
 function _gsb_box_case_import_get_folder_data($offset, $limit) {
-  $token = 'L2J1YVbkxCNAQF5IxfLr6VpBBiopt0US';
+  $token = gsb_box_get_access_token();
 
   if ($token != "Error JWT Token") {
     $options = [
@@ -2057,4 +2055,307 @@ function gsb_box_case_batch_import_finished($success, $results, $operations) {
     ));
     drupal_set_message($message, 'error');
   }
+}
+
+/**
+ * Updates the drupal case content types.
+ */
+function _gsb_box_case_update($box_data = array()) {
+    // Validating Product Types  'Case' Content type
+    $meta_data = $box_data['metadata']["enterprise_86433"]["gsbitops"];
+    $product_type = trim($meta_data['productType']);
+    if ($product_type != 'Case') {
+      return;
+    }
+
+    $fileid = "";
+    if (!empty($box_data['id']) && trim( $box_data['id']) != '') {
+       $fileid = $box_data['id'];
+    }
+    else {
+      return;
+    }
+
+    // Attempt to find a node with the box file id
+    $query = new EntityFieldQuery();
+    $query->fieldCondition('field_instance_text', 'value', $fileid, '=')->range(0, 1);
+    $entities = $query->execute();
+
+    if (!empty($entities['node'])) {
+      // a node already exists, so load it
+      $nids = array_keys($entities['node']);
+      $node = node_load(array_shift($nids));
+    } else {
+      // if a case node doesn't exist
+      // we do not import(create) Cases that are marked as 'Not for distribution'
+      return;
+    }
+
+    // if the node isn't a Case, then bail
+    if ($node->type != 'case') {
+      return;
+    }
+
+    $language = $node->language;
+    $ewrapper = entity_metadata_wrapper('node', $node);
+
+    //Setting box file id
+    $ewrapper->field_instance_text->set($fileid);
+
+    if (!empty($meta_data['title']) && trim($meta_data['title']) != '') {
+      $ewrapper->title->set($meta_data['title']);
+    } else {
+      // if title is empty, then try to use document name
+      if (!empty($meta_data['itemId1']) && trim($meta_data['itemId1']) != '') {
+        $ewrapper->title->set($meta_data['itemId1']);
+      } else {
+        $ewrapper->title->set('no title');
+      }
+    }
+
+    //fetching case access field values
+    $all_fields         = field_info_fields();
+    $case_access_values = list_allowed_values($all_fields["field_case_access"]);
+    // setting default value of case access is 'Not for distribution'
+    $case_access = trim($case_access_values['Not for distribution']);
+    if (!empty($meta_data['caseStudyAccess1']) && trim($meta_data['caseStudyAccess1']) != '') {
+      $case_access = trim($meta_data['caseStudyAccess1']);
+    }
+    if (!empty($meta_data['caseStudyAccess1']) && trim($meta_data['caseStudyAccess1']) != '') {
+          if (strtolower($case_access) == strtolower(trim($case_access_values['Instructors only'])) ) 
+          $case_access = trim($case_access_values['Instructors only']);
+          else if (strtolower($case_access) == strtolower(trim($case_access_values['Educational use only'])) )
+          $case_access = trim($case_access_values['Educational use only']);
+          else
+          $case_access = trim($meta_data['caseStudyAccess1']) ;
+        $ewrapper->field_case_access->set($case_access);
+    } else {
+        $ewrapper->field_case_access->set('Not for distribution');
+    }
+
+    if (!empty($meta_data['publicationYear']) && trim($meta_data['publicationYear']) != '') {
+      $year = $meta_data['publicationYear'];
+     if (is_numeric($year)) {
+        $date = new DateTime($year."-02-02");
+        $ewrapper->field_year_of_publication->set($date->getTimestamp());
+      } else {
+        $ewrapper->field_year_of_publication = NULL;
+      }
+    } else {
+      $ewrapper->field_year_of_publication = NULL;
+    }
+
+    if (!empty($box_data['name']) && trim($box_data['name']) != '') {
+      $ewrapper->field_document_name->set($box_data['name']);
+    } else {
+      $ewrapper->field_document_name->set(NULL);
+    }
+
+    if (!empty($meta_data['abstract']) && trim($meta_data['abstract']) != '') {
+      $description = $meta_data['abstract'];
+      $description = str_replace('\n','<br/>',$description);
+      $description = stripslashes($description);
+      $ewrapper->field_description = array(
+        'value' => $description,
+        'format' => 'gsb_wysiwyg_text',
+      );
+    } else {
+      $ewrapper->field_description = array(
+        'value' => '',
+        'format' => 'gsb_wysiwyg_text',
+      );
+    }
+
+    $url = trim($main_data['shared_link']['download_url']);
+    if (!empty($url)) {
+      if (valid_url($url, TRUE)) {
+        $url = _gsb_box_force_protocol($url);
+        $ewrapper->field_link_document->url->set($url);
+      } else {
+        $ewrapper->field_link_document->set($url);
+      }
+    } else {
+      $ewrapper->field_link_document->set(NULL);
+    }
+
+    if (!empty($meta_data['author']) && trim($meta_data['author']) != '') {
+      $ewrapper->field_author->set($meta_data['author']);
+    } else {
+      $ewrapper->field_author->set(NULL);
+    }
+
+    if (!empty($meta_data['permissionsStatement']) && trim($meta_data['permissionsStatement']) != '') {
+      $ewrapper->field_permissions_statement->set($meta_data['permissionsStatement']);
+    } else {
+      $ewrapper->field_permissions_statement->set(NULL);
+    }
+
+    $url_harvard = $meta_data['linkAtHarvard'];
+    if (!empty($url_harvard)) {
+      $url_harvard = _gsb_box_force_protocol($url_harvard);
+      if (valid_url($url_harvard, TRUE)) {
+        $ewrapper->field_link_single->url->set($url_harvard);
+        $ewrapper->field_has_harvard_link->set("1");
+      } else {
+        $ewrapper->field_link_single->set(NULL);
+        $ewrapper->field_has_harvard_link->set("0");
+      }
+    } else {
+      $ewrapper->field_link_single->set(NULL);
+      $ewrapper->field_has_harvard_link->set("0");
+    }
+
+   $url_casecenter = $meta_data['theCaseCenterLink'];
+    if (!empty($url_casecenter)) {
+      $url_casecenter = _gsb_box_force_protocol($url_casecenter);
+      if (valid_url($url_casecenter, TRUE)) {
+        $ewrapper->field_link_center_single->url->set($url_casecenter);
+        $ewrapper->field_has_case_center->set("1");
+      } else {
+        $ewrapper->field_link_center_single->set(NULL);
+        $ewrapper->field_has_case_center->set("0");
+      }
+    } else {
+      $ewrapper->field_link_center_single->set(NULL);
+      $ewrapper->field_has_case_center->set("0");
+    }
+
+     if (!empty($meta_data['citation']) && trim($meta_data['citation']) != '') {
+      $citation = $meta_data['citation'];
+      $citation = str_replace('\n','<br/>',$citation);
+      $citation = stripslashes($citation);
+      $ewrapper->field_citation = array(
+        'value' => $citation,
+        'format' => 'gsb_wysiwyg_text',
+      );
+    } else {
+      $ewrapper->field_citation = array(
+        'value' => '',
+        'format' => 'gsb_wysiwyg_text',
+      );
+    }
+
+    if (!empty($meta_data['learningObjective']) && trim($meta_data['learningObjective']) != '') {
+      $learning = $meta_data['learningObjective'];
+      $learning = str_replace('\n','<br/>',$learning);
+      $learning = stripslashes($learning);
+      $ewrapper->field_learning_objective = array(
+        'value' => $learning,
+        'format' => 'gsb_wysiwyg_text',
+      );
+    } else {
+      $ewrapper->field_learning_objective = array(
+        'value' => '',
+        'format' => 'gsb_wysiwyg_text',
+      );
+    }
+
+    if (!empty($meta_data['length']) && trim($meta_data['length']) != '') {
+      $ewrapper->field_page_count->set($meta_data['length']);
+    } else {
+      $ewrapper->field_page_count->set(NULL);
+    }
+
+    $ewrapper->field_product_type->set($product_type);
+
+    if (!empty($meta_data['businessTopics1']) && trim($meta_data['businessTopics1']) != '') {
+      $ids = array();
+      $bi_topic = $meta_data['businessTopics1'];
+      $results = taxonomy_get_term_by_name($bi_topic);
+      foreach ($results as $item) {
+        if ($item->vocabulary_machine_name == 'business_insight_topic') {
+          $ids[] = $item->tid;
+        }
+      }
+      $ewrapper->field_business_insight_topic->set($ids);
+    } else {
+      $ewrapper->field_business_insight_topic = array();
+    }
+
+    if (!empty($meta_data['academicArea2']) && trim($meta_data['academicArea2']) != '') {
+      $ids = array();
+      $academic_area = $meta_data['academicArea2'];
+      $results = taxonomy_get_term_by_name($academic_area);
+      foreach ($results as $item) {
+        if ($item->vocabulary_machine_name == 'academic_area') {
+          $ids[] = $item->tid;
+        }
+      }
+      $ewrapper->field_academic_area_unlimited->set($ids);
+    } else {
+      $ewrapper->field_academic_area_unlimited = array();
+    }
+
+    if (!empty($meta_data['centersInitiativesInstitutes']) && trim($meta_data['centersInitiativesInstitutes']) != '') {
+      $ids = array();
+      $centers = $meta_data['centersInitiativesInstitutes'];
+      $results = taxonomy_get_term_by_name($centers);
+      foreach ($results as $item) {
+        if ($item->vocabulary_machine_name == 'centers_research_programs') {
+          $ids[] = $item->tid;
+        }
+      }
+      $ewrapper->field_centers_research_programs->set($ids);
+    } else {
+      $ewrapper->field_centers_research_programs = array();
+    }
+
+     $ewrapper->field_paper_copy->set('No');
+
+    if (!empty($meta_data['itemId1']) && trim($meta_data['itemId1']) != '') {
+      $ewrapper->field_item_id->set($meta_data['itemId1']);
+    } else {
+      $ewrapper->field_item_id->set(NULL);
+    }
+
+    if(!empty($meta_data['tags']) )
+      $tags = explode(",", $meta_data['tags']);
+    else
+      $tags = "";
+    if (!empty($tags)) {
+      $ids = array();
+      $term_list = array();
+      _gsb_box_add_tags($tags);
+      foreach($tags as $term) {
+        $results = taxonomy_get_term_by_name($term);
+        $term_list = array_merge($term_list, $results);
+      }
+      foreach ($term_list as $item) {
+        if ($item->vocabulary_machine_name == 'tag') {
+          $ids[] = $item->tid;
+        }
+      }
+      $ewrapper->field_tag->set($ids);
+    } else {
+      $ewrapper->field_tag = array();
+    }
+
+    // TODO
+    //_gsb_box_import_sunet_authors($node, $ewrapper, $meta_data);
+
+    $ewrapper->field_free_case->set("0");
+    if ($case_access == 'Free') {
+      $ewrapper->field_free_case->set("1");
+    }
+
+    $ewrapper->save();
+    $node = node_load($node->nid);
+    // get the new list of authors saved with the node
+    $authors = $ewrapper->field_authors->value();
+    // update the list to remove any field collections that
+    // have been deleted and then save the node
+    if (!empty($authors)) {
+      unset($node->field_authors[$language]);
+      $node->field_authors[$language] = array();
+      foreach($authors as $key => $author) {
+        if ($author == null) {
+          // skipping the deleted item
+          continue;
+        }
+        $node->field_authors[$language][] = array('revision_id' => $author->revision_id, 'value' => $author->item_id);
+      }
+    }
+    $node->status = 1;
+    $node->workbench_moderation['updating_live_revision'] = 1;
+    node_save($node);
 }
