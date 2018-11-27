@@ -1964,7 +1964,7 @@ function gsb_box_case_batch_import() {
   $batch = [
     'operations' => [],
     'finished' => 'gsb_box_case_batch_import_finished',
-    'title' => t('Box Batch Import'),
+    'title' => t('Box Batch Full Import'),
     'init_message' => t('Import is starting...'),
     'progress_message' => t('Processed @current out of @total.'),
     'error_message' => t('Import has encountered an error.')
@@ -2331,7 +2331,8 @@ function _gsb_box_case_update($box_data = array()) {
     }
 
     // TODO
-    //_gsb_box_import_sunet_authors($node, $ewrapper, $meta_data);
+    $authors['entries'][0] = $meta_data;
+    _gsb_box_import_sunet_authors($node, $ewrapper, $authors);
 
     $ewrapper->field_free_case->set("0");
     if ($case_access == 'Free') {
