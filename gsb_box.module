@@ -150,28 +150,34 @@ function gsb_box_case_files_import_bydate($params = array()) {
         $qry = http_build_query($qry_data, '', '&');
         $response = drupal_http_request('https://api.box.com/2.0/search?'.$qry,$options);
         $folder_data = drupal_json_decode($response->data);
-        echo "=========== Total Files for to create/update - ".$folder_data['total_count']."  ========";
-        echo "<br/>";
+        _gsb_box_log("== Total Files for to create/update/delete - ".$folder_data['total_count']."  ==", "success");
         if(isset( $folder_data['entries']) && $folder_data['total_count'] > 0) {
             $count = 1;
+            $header = array('Node Id', 'Node Title', 'Box File Id', 'Status');
+            $result_rows = array();
             foreach($folder_data['entries'] as $row) {
               if($row['type'] == 'file') {
                   $res_meta_data = _gsb_box_fetch_file_meta_details($token,$row["id"]);
                   if(isset( $res_meta_data)) {
-                    _gsb_box_case_node_import($res_meta_data,$row,$token);
+                    $result_data = _gsb_box_case_node_import($res_meta_data,$row,$token);
+                    $result_rows = array_merge($result_rows, $result_data);
                     $count ++;
                   }
                }
             }
+            $body[] = gsb_box_render_table($result_rows, $header);
+            $body[] = '</br>';
+            _gsb_box_cron_mail_send($body);
         } 
         else {
-          echo 'No Box case files avilable for to create/update!';
-          drupal_set_message('No Box case files avilable for to create/update!');
+          _gsb_box_log('No Box case files avilable for to create/update!','success');
+          //drupal_set_message('No Box case files avilable for to create/update!');
         }
    }
    else
    {
-      drupal_set_message('Box JWT Token has not generated!');
+      _gsb_box_log('Box JWT Token has not generated!','success');
+      //drupal_set_message('Box JWT Token has not generated!');
    }
   
 }
@@ -289,7 +295,7 @@ function gsb_box_download_box_doc($node) {
     exit();
 }
 
-function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token, $update_box = TRUE) {
+function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$token) {
 
     global $user;
     // Validating Product Types  'Case' Content type 
@@ -331,9 +337,17 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
       // if a case node doesn't exist
       // we do not import(create) Cases that are marked as 'Not for distribution'
       if (strtolower($case_access) == strtolower(trim($case_access_values['Not for distribution'])) ) {
+        $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
+        $options = array(
+                    'method'  => 'PUT',
+                    'data'    =>  $qry_data,
+                    'headers' => array('Content-Type' => 'application/json-patch+json',
+                    'Authorization' => 'Bearer '.$token),
+                    );
+        $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
         _gsb_box_log('Case Node not able to create with case access value - Not for distribution and Box File ID: '.$fileid , 'success');
-        echo 'Case Node not able to create with case access value - Not for distribution and Box File ID: '.$fileid;        
-        return;
+        $result_rows[] = array('', $meta_data['entries'][0]['title'],$fileid,'Case node not created with access value - Not for distribution');
+        return $result_rows;      
       }
 
       // create a node
@@ -356,9 +370,8 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
       // delete case node
       $nid = $node->nid;
       node_delete($node->nid);
-      echo 'Case Node deleted successfully with case access value - Not for distribution,  Box File ID: '.$fileid .' and Node ID: '.$nid;
       _gsb_box_log('Case Node deleted successfully with case access value - Not for distribution,  Box File ID: '.$fileid .' and Node ID: '.$nid, 'success');
-      
+ 
       $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
       $options   = array(
                     'method'  => 'PUT',
@@ -367,7 +380,9 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
                     'Authorization' => 'Bearer '.$token),
                     );
       $response_data = drupal_http_request('https://api.box.com/2.0/files/'.$fileid.'/metadata/'.$enterprise_id.'/gsbitops',$options);
-      return;
+      
+      $result_rows[] = array($nid, $meta_data['entries'][0]['title'],$fileid,'Case node deleted with case access value - Not for distribution');
+      return $result_rows;
     }
 
     $language = $node->language;
@@ -656,30 +671,36 @@ function _gsb_box_case_node_import($meta_data = array(), $main_data=array(),$tok
     }
     $node->status = 1;
     $node->workbench_moderation['updating_live_revision'] = 1;
-    node_save($node);
-    
-    if ($update_box) {
-      _gsb_box_log('Case node created/updated successfully with File ID : ' . $fileid . ' And Node ID: ' . $node->nid, 'success');
+    try
+    {
+       node_save($node);
+      _gsb_box_log('Case node created/updated successfully with File ID : ' . $fileid . ' and Node ID: ' . $node->nid, 'success');
 
-      $enterprise_id = "enterprise_" . trim(variable_get('box_enterprise_id'));
-      $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
-      $options = [
-        'method' => 'PUT',
-        'data' => $qry_data,
-        'headers' => [
-          'Content-Type' => 'application/json-patch+json',
-          'Authorization' => 'Bearer ' . $token
-        ],
-      ];
-      $response_data = drupal_http_request('https://api.box.com/2.0/files/' . $fileid . '/metadata/' . $enterprise_id . '/gsbitops', $options);
-      if ($response_data->status_message == 'OK' && $response_data->code == '200') {
-        echo "Box file metadata field Publish set to default value for File ID: " . $fileid;
-        _gsb_box_log('Box file metadata field Publish set to default value for File ID: ' . $fileid, 'success');
-      }
-      else {
-        echo "Box file metadata field Publish failed to update for File ID: " . $fileid;
-        _gsb_box_log('Box file metadata field Publish failed to update for File ID: ' . $fileid, 'success');
-      }
+        $enterprise_id = "enterprise_" . trim(variable_get('box_enterprise_id'));
+        $qry_data = '[{"op":"test","path":"/publish","value":"Yes"},{"op":"remove","path":"/publish"}]';
+        $options = [
+          'method' => 'PUT',
+          'data' => $qry_data,
+          'headers' => [
+            'Content-Type' => 'application/json-patch+json',
+            'Authorization' => 'Bearer ' . $token
+          ],
+        ];
+        $response_data = drupal_http_request('https://api.box.com/2.0/files/' . $fileid . '/metadata/' . $enterprise_id . '/gsbitops', $options);
+        if ($response_data->status_message == 'OK' && $response_data->code == '200') {
+          _gsb_box_log('Box file metadata field value Publish set to default value for File ID: ' . $fileid, 'success');
+        }
+        else {
+           _gsb_box_log('Box file metadata field value Publish failed to update for File ID: ' . $fileid, 'success');
+        }
+        $result_rows[] = array($node->nid, $node->title,$fileid,'Case node created/updated successfully');
+        return $result_rows;
+    }
+    catch (Exception $e) {
+      // Do your error handling here.
+        _gsb_box_log('Case node failed to create/update with File ID:'.$fileid, 'success');
+        $result_rows[] = array($node->nid, $node->title,$fileid,$e);
+        return $result_rows;
     }
 }
 
@@ -2360,3 +2381,53 @@ function _gsb_box_case_update($box_data = array()) {
     $node->workbench_moderation['updating_live_revision'] = 1;
     node_save($node);
 }
+
+/**
+ * Helper function gsb_box_render_table() gets table output.
+ */
+function gsb_box_render_table($rows, $header) {
+  $table_style = array(
+    'border' => '1',
+    'style' => 'background-color:#D3D0D0;border-collapse:collapse;border:1px solid #000000;width:60%',
+    'cellpadding' => '3',
+    'cellspacing' => '3',
+  );
+
+  $table = theme('table', array(
+     'header' => $header,
+     'rows' => $rows,
+     'attributes' => $table_style
+  ));
+  return $table;
+}
+
+/**
+ * Helper function for mail send
+ */
+
+function _gsb_box_cron_mail_send($body) {
+
+    $eol  = variable_get('mail_line_endings', MAIL_LINE_ENDINGS);
+    $to   = variable_get('box_cron_to_email', NULL);
+    $from = variable_get('site_mail', 'webmaster@stanford.edu');
+
+    // Set the mail parameters
+    $params = array(
+      'body' => $body,
+      'subject' => t(variable_get('box_cron_email_subject','GSB Box Cron') ),
+    );
+
+    // Mail sending.
+  
+      if ($message = drupal_mail('gsb_box', 'Box Cron', $to, language_default(), $params, $from)) {
+        drupal_set_message(t('GSB Box cron mail sent.'));
+      }
+      else {
+        watchdog('gsb_box', 'There was an error sending mail.');
+      }
+    
+      $body = implode("<br />$eol", $body);
+      drupal_set_message($body);
+    
+}
+
