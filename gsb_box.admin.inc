@@ -90,11 +90,22 @@ function gsb_box_settings_form($form, $form_state) {
       '#default_value' =>variable_get('box_syllabi_folder_id'),
       '#required' => TRUE,
     );
-  /* $form['box']['box_private_key'] = array(
+   /* $form['box']['box_private_key'] = array(
       '#title'=>'Box Api Private Key',
       '#type' => 'textarea',
       '#default_value' =>variable_get('box_private_key'),
       '#required' => TRUE,
     );*/
+     $form['box']['box_cron_to_email'] = array(
+      '#title'=>'Email(To Address)',
+      '#type' => 'textfield',
+      '#default_value' =>variable_get('box_cron_to_email'),
+      '#description' => t('Use comma separated values. When cron job execute mail sends out to the email address.')
+    );
+    $form['box']['box_cron_email_subject'] = array(
+      '#title'=>'Email Subject',
+      '#type' => 'textfield',
+      '#default_value' =>variable_get('box_cron_email_subject')
+    );
     return system_settings_form($form, $form_state);
 }
