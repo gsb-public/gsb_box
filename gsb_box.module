@@ -2408,26 +2408,41 @@ function gsb_box_render_table($rows, $header) {
 function _gsb_box_cron_mail_send($body) {
 
     $eol  = variable_get('mail_line_endings', MAIL_LINE_ENDINGS);
-    $to   = variable_get('box_cron_to_email', NULL);
+    $to   = variable_get('box_cron_to_email',  t(''));
     $from = variable_get('site_mail', 'webmaster@stanford.edu');
-
+ 
     // Set the mail parameters
-    $params = array(
-      'body' => $body,
-      'subject' => t(variable_get('box_cron_email_subject','GSB Box Cron') ),
-    );
+    $params['body']    = $body;
+    $params['subject'] = variable_get('box_cron_email_subject','GSB Box Cron Job');
+    $params['name']    = 'GSB Box';
+    $params['default_message'] = 'This is GSB Box case cron job executing result.';
+    $params['message'] = 'This is GSB Box case cron job executing result.';
 
     // Mail sending.
-  
-      if ($message = drupal_mail('gsb_box', 'Box Cron', $to, language_default(), $params, $from)) {
+    if ($message = drupal_mail('gsb_box', 'GSB-Box', $to, language_default(), $params, $from)) {
         drupal_set_message(t('GSB Box cron mail sent.'));
-      }
-      else {
+    }
+    else {
         watchdog('gsb_box', 'There was an error sending mail.');
-      }
-    
-      $body = implode("<br />$eol", $body);
-      drupal_set_message($body);
-    
+    }
+    $body = implode("<br />$eol", $body);
+    drupal_set_message($body);    
+}
+
+/**
+ * Implements hook_mail().
+ */
+function gsb_box_mail($key, &$message, $params) {
+  $headers = array(
+    'MIME-Version' => '1.0',
+    'Content-Type' => 'text/html; charset=UTF-8;',
+    'Content-Transfer-Encoding' => '8Bit',
+    'X-Mailer' => 'Drupal'
+  );
+  foreach ($headers as $key => $value) {
+    $message['headers'][$key] = $value;
+  }
+  $message['subject'] = $params['subject'];
+  $message['body'] = $params['body'];
 }
 
