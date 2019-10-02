@@ -125,7 +125,7 @@ class JwtToken
     public function create_jwt_token()
     {
        date_default_timezone_set("UTC"); 
-       $tokenId    = base64_encode(mcrypt_create_iv(32));
+       $tokenId    = base64_encode(random_bytes(32));
        $issuedAt   = time();
        $notBefore  = $issuedAt + 10;             //Adding 10 seconds
        $expire     = $issuedAt + 60;            // Adding 60 seconds   
